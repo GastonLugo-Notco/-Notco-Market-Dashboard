@@ -167,7 +167,6 @@ select option{background:var(--surface)}
 
   <!-- LOGYT -->
   <div id="panel-logyt" class="panel">
-    <div class="finde-selector" id="finde-sel"></div>
     <div id="logyt-content"><div class="loading"><div class="spinner"></div>Cargando ventas...</div></div>
   </div>
 
@@ -339,113 +338,85 @@ function setFinde(i, btn){
 }
 
 function renderLogyt(){
-  const allPeriods = [...new Set(LOGYT.map(d=>d.periodo_label))];
-  if(allPeriods.length < 2){
-    document.getElementById('logyt-content').innerHTML = '<div class="empty">Cargando datos de ventas...</div>';
-    return;
-  }
-  const pAnt = allPeriods[selectedFinde];
-  const pAct = allPeriods[selectedFinde+1];
+    const cadenas = [
+      {key:'CARREFOUR',label:'Carrefour'},
+      {key:'DIA',label:'Dia'},
+      {key:'LA_ANONIMA',label:'La Anónima'},
+      {key:'CENCO',label:'Cenco'},
+      {key:'VEA',label:'Vea'},
+    ];
+    const PROD_LABELS = {bars:'Not Protein Bars',burger:'Not Burger',mila:'Not Mila',chicken:'Not Chicken',pork:'Not Pork',milk:'Not Milk'};
 
-  const cadenas = [
-    {key:'CARREFOUR',label:'Carrefour'},
-    {key:'DIA',label:'Dia'},
-    {key:'LA_ANONIMA',label:'La Anónima'},
-    {key:'CENCO',label:'Cenco (Disco+Jumbo)'},
-    {key:'VEA',label:'Vea'},
-  ];
+    function getRows(cad){ return LOGYT.filter(d=>d.cadena===cad).sort((a,b)=>a.fecha_desde>b.fecha_desde?1:-1); }
+    function pct(a,b){ if(!a||!b) return null; return Math.round((b-a)/a*100); }
+    function fmtPct(v){ if(v===null) return '—'; return (v>0?'+':'')+v+'%'; }
+    function pctClass(v){ if(v===null) return 'nt'; return v>0?'up':'dn'; }
+    function fmt(n){ return n?Math.round(n).toLocaleString('es-AR'):'—'; }
 
-  function getRow(cadena, periodo){
-    return LOGYT.find(d=>d.cadena===cadena && d.periodo_label===periodo);
-  }
+    if(!LOGYT.length){
+      document.getElementById('logyt-content').innerHTML = '<div class="empty">Sin datos de ventas cargados aún.</div>';
+      return;
+    }
 
-  function pct(a,b){ if(!a||!b) return null; return Math.round((b-a)/a*100); }
-  function fmtPct(v){ if(v===null) return '—'; return (v>0?'+':'')+v+'%'; }
-  function pctClass(v){ if(v===null) return 'nt'; return v>0?'up':'dn'; }
-  function fmt(n){ return n?Math.round(n).toLocaleString('es-AR'):'—'; }
+    let html = '<div class="cadena-grid">';
+    cadenas.forEach(c=>{
+      const rows = getRows(c.key);
+      if(!rows.length) return;
 
-  // Summary metrics
-  let totalAnt=0, totalAct=0;
-  cadenas.forEach(c=>{
-    const a=getRow(c.key,pAnt), b=getRow(c.key,pAct);
-    if(a) totalAnt+=a.total||0;
-    if(b) totalAct+=b.total||0;
-  });
-  const totalVar = pct(totalAnt,totalAct);
+      const act = rows[rows.length-1];
+      const ant = rows.length>1 ? rows[rows.length-2] : null;
+      const v = ant ? pct(ant.total, act.total) : null;
+      const bclass = v===null?'badge-nt':v>0?'badge-up':'badge-dn';
+      const veaTag = c.key==='VEA' ? `<span class="vea-tag">${act.tiene_dinamica?'con din.':'sin din.'}</span>` : '';
 
-  let html = `<div class="metrics">
-    <div class="metric">
-      <div class="metric-label">Total mercado</div>
-      <div class="metric-val ${pctClass(totalVar)}">${fmtPct(totalVar)}</div>
-      <div class="metric-sub">${fmt(totalAnt)} → ${fmt(totalAct)} uni</div>
-    </div>`;
+      html += `<div class="cadena-card">
+        <div class="cadena-card-header">
+          <span class="cadena-name">${c.label}${veaTag}</span>
+          <span class="cadena-badge ${bclass}">${fmtPct(v)}</span>
+        </div>
+        <div class="cadena-body">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:11px;font-family:DM Mono,monospace;color:var(--text3)">
+            <span>${ant?ant.periodo_label:'—'}</span><span>→</span>
+            <span style="color:var(--text2)">${act.periodo_label}</span>
+          </div>
+          <div class="prod-row prod-row-total">
+            <span class="prod-name" style="color:var(--text);font-weight:600">Total</span>
+            <div class="prod-vals">
+              <span class="prod-nums">${ant?fmt(ant.total):'—'} → ${fmt(act.total)}</span>
+              <span class="prod-var ${pctClass(v)}">${fmtPct(v)}</span>
+            </div>
+          </div>`;
 
-  const barsAnt = cadenas.reduce((s,c)=>{const r=getRow(c.key,pAnt);return s+(r?r.bars||0:0)},0);
-  const barsAct = cadenas.reduce((s,c)=>{const r=getRow(c.key,pAct);return s+(r?r.bars||0:0)},0);
-  const barsVar = pct(barsAnt,barsAct);
-  html += `<div class="metric">
-    <div class="metric-label">Barras</div>
-    <div class="metric-val ${pctClass(barsVar)}">${fmtPct(barsVar)}</div>
-    <div class="metric-sub">${fmt(barsAnt)} → ${fmt(barsAct)} uni</div>
-  </div>`;
-
-  const rcAnt = cadenas.reduce((s,c)=>{const r=getRow(c.key,pAnt);return s+(r?(r.burger||0)+(r.mila||0)+(r.chicken||0)+(r.pork||0):0)},0);
-  const rcAct = cadenas.reduce((s,c)=>{const r=getRow(c.key,pAct);return s+(r?(r.burger||0)+(r.mila||0)+(r.chicken||0)+(r.pork||0):0)},0);
-  const rcVar = pct(rcAnt,rcAct);
-  html += `<div class="metric">
-    <div class="metric-label">Reemplazo cárnico</div>
-    <div class="metric-val ${pctClass(rcVar)}">${fmtPct(rcVar)}</div>
-    <div class="metric-sub">${fmt(rcAnt)} → ${fmt(rcAct)} uni</div>
-  </div>`;
-
-  const veaAnt = getRow('VEA',pAnt), veaAct = getRow('VEA',pAct);
-  if(veaAct){
-    html += `<div class="metric">
-      <div class="metric-label">Vea</div>
-      <div class="metric-val ${veaAct.tiene_dinamica?'up':'dn'}">${veaAct.tiene_dinamica?'Con din.':'Sin din.'}</div>
-      <div class="metric-sub">${fmt(veaAnt?.total||0)} → ${fmt(veaAct.total||0)} uni</div>
-    </div>`;
-  }
-  html += '</div>';
-
-  // Cadena cards
-  html += '<div class="cadena-grid">';
-  cadenas.forEach(c=>{
-    const ant = getRow(c.key,pAnt), act = getRow(c.key,pAct);
-    if(!ant || !act) return;
-    const v = pct(ant.total,act.total);
-    const bclass = v>0?'badge-up':v<0?'badge-dn':'badge-nt';
-    const prods = ['bars','burger','mila','chicken','pork','milk'].filter(p=>ant[p]||act[p]);
-
-    let veaTag = c.key==='VEA'?`<span class="vea-tag">${act.tiene_dinamica?'con din.':'sin din.'}</span>`:'';
-
-    html += `<div class="cadena-card">
-      <div class="cadena-card-header">
-        <span class="cadena-name">${c.label}${veaTag}</span>
-        <span class="cadena-badge ${bclass}">${fmtPct(v)}</span>
-      </div>
-      <div class="cadena-body">
-        <div class="prod-row prod-row-total">
-          <span class="prod-name" style="color:var(--text);font-weight:600">Total</span>
+      ['bars','burger','mila','chicken','pork','milk'].forEach(p=>{
+        if(!act[p] && !(ant&&ant[p])) return;
+        const pv = ant ? pct(ant[p], act[p]) : null;
+        html += `<div class="prod-row">
+          <span class="prod-name">${PROD_LABELS[p]}</span>
           <div class="prod-vals">
-            <span class="prod-nums">${fmt(ant.total)} → ${fmt(act.total)}</span>
+            <span class="prod-nums">${ant?fmt(ant[p]):'—'} → ${fmt(act[p])}</span>
+            <span class="prod-var ${pctClass(pv)}">${fmtPct(pv)}</span>
           </div>
         </div>`;
-    prods.forEach(p=>{
-      const pv = pct(ant[p],act[p]);
-      html += `<div class="prod-row">
-        <span class="prod-name">${PROD_LABELS[p.toUpperCase()]||p}</span>
-        <div class="prod-vals">
-          <span class="prod-nums">${fmt(ant[p])} → ${fmt(act[p])}</span>
-          <span class="prod-var ${pctClass(pv)}">${fmtPct(pv)}</span>
-        </div>
-      </div>`;
+      });
+
+      if(rows.length>2){
+        html += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">Historial</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">`;
+        rows.forEach(r=>{
+          html += `<div style="font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 8px">
+            <span style="color:var(--text3)">${r.periodo_label}</span>
+            <span style="color:var(--text);margin-left:4px;font-weight:600">${fmt(r.total)}</span>
+          </div>`;
+        });
+        html += '</div></div>';
+      }
+
+      html += '</div></div>';
     });
-    html += `</div></div>`;
-  });
-  html += '</div>';
-  document.getElementById('logyt-content').innerHTML = html;
-}
+    html += '</div>';
+    document.getElementById('logyt-content').innerHTML = html;
+  }
 
 function renderTendencia(){
   const allPeriods = [...new Set(LOGYT.map(d=>d.periodo_label))];
@@ -487,9 +458,9 @@ function renderTendencia(){
   });
 
   // Por producto
-  const prods = ['bars','burger','mila','chicken','pork'];
-  const prodColors = {bars:'#1db97a',burger:'#6c63ff',mila:'#f5a623',chicken:'#e85d5d',pork:'#378ADD'};
-  const prodNames = {bars:'Barras',burger:'Not Burger',mila:'Not Mila',chicken:'Not Chicken',pork:'Not Pork'};
+  const prods = ['bars','burger','mila','chicken','pork','milk'];
+  const prodColors = {bars:'#1db97a',burger:'#6c63ff',mila:'#f5a623',chicken:'#e85d5d',pork:'#378ADD',milk:'#7ecfb0'};
+  const prodNames = {bars:'Not Protein Bars',burger:'Not Burger',mila:'Not Mila',chicken:'Not Chicken',pork:'Not Pork',milk:'Not Milk'};
 
   let legendHtml = prods.map(p=>`<div class="legend-item"><div class="legend-dot" style="background:${prodColors[p]}"></div>${prodNames[p]}</div>`).join('');
   document.getElementById('prod-legend').innerHTML = legendHtml;
