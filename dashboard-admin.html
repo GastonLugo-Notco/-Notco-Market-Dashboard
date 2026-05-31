@@ -167,42 +167,47 @@ select option{background:var(--surface)}
     </div>
   </div>
 
-  <!-- LOGYT DESDE EXCEL -->
+  <!-- LOGYT TABLA -->
   <div id="panel-logyt" class="panel">
-    <div class="section-title">Cargar ventas LOGYT desde Excel</div>
-    <div class="section-sub">Subí el Excel de ventas que armás cada semana. Se leen todos los bloques automáticamente — cadena, período, productos y totales.</div>
+    <div class="section-title">Cargar ventas LOGYT</div>
+    <div class="section-sub">Completá la tabla y guardá todo de una vez. Dejá en 0 los productos que no apliquen.</div>
 
-    <div class="drop-zone" id="drop-zone-lo">
-      <input type="file" accept=".xlsx,.xls" onchange="handleLogytFile(this.files[0])">
-      <div class="drop-icon" id="drop-icon-lo">📂</div>
-      <div class="drop-title" id="drop-title-lo">Arrastrá el Excel de ventas o hacé clic</div>
-      <div class="drop-sub" id="drop-sub-lo">Formato: venta_finde_cadenas.xlsx</div>
-    </div>
+    <div class="card">
+      <div class="grid-2" style="margin-bottom:16px">
+        <div class="field" style="margin:0">
+          <label class="field-label">Período *</label>
+          <input type="text" id="lo-label" placeholder="Ej: 22-24 may">
+        </div>
+        <div class="field" style="margin:0">
+          <label class="field-label">¿Tienen dinámica Notco?</label>
+          <div class="radio-group" style="margin-top:4px">
+            <div class="radio-opt sel" id="ro-din-si" onclick="setDin(true)">Sí</div>
+            <div class="radio-opt" id="ro-din-no" onclick="setDin(false)">No</div>
+          </div>
+        </div>
+      </div>
 
-    <div id="logyt-stats" style="display:none">
-      <div class="stats">
-        <div class="stat"><div class="stat-val" id="ls-bloques">0</div><div class="stat-label">Bloques</div></div>
-        <div class="stat"><div class="stat-val" id="ls-cadenas">0</div><div class="stat-label">Cadenas</div></div>
-        <div class="stat"><div class="stat-val" id="ls-periodos">0</div><div class="stat-label">Períodos únicos</div></div>
+      <div style="overflow-x:auto;margin-bottom:16px">
+        <table id="lo-table" style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:8px 10px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace;white-space:nowrap">Cadena</th>
+              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">Desde</th>
+              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">Hasta</th>
+              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">🍫 Barras</th>
+              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">🍔 Burger</th>
+              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">🥩 Mila</th>
+              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">🐔 Chicken</th>
+              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">🐷 Pork</th>
+              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">🥛 Milk</th>
+              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">Total</th>
+            </tr>
+          </thead>
+          <tbody id="lo-tbody"></tbody>
+        </table>
       </div>
-    </div>
 
-    <div id="logyt-preview-section" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <span style="font-size:13px;font-weight:600">Bloques detectados</span>
-        <button class="btn-outline" onclick="clearLogytFile()">✕ Limpiar</button>
-      </div>
-      <div class="preview-wrap">
-        <table id="logyt-preview-table"></table>
-      </div>
-      <div class="progress-wrap" id="lo-progress-wrap">
-        <div class="progress-label" id="lo-progress-label">Subiendo...</div>
-        <div class="progress-bar"><div class="progress-fill" id="lo-progress-fill" style="width:0%"></div></div>
-      </div>
-      <div class="btn-row">
-        <button class="btn" onclick="uploadLogyt()" id="btn-lo-upload">⬆ Subir a Supabase</button>
-      </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:8px;font-family:'DM Mono',monospace">Los bloques duplicados (misma cadena + período) se omiten automáticamente.</div>
+      <button class="btn" onclick="saveAllLogyt()" id="btn-lo-all">⬆ Guardar todo</button>
     </div>
   </div>
 
@@ -400,46 +405,98 @@ dz.addEventListener('dragleave', ()=>dz.classList.remove('drag'));
 dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
 
 // =====================
-// LOGYT MANUAL
+// LOGYT TABLA
 // =====================
+const LO_CADENAS = [
+  {key:'CARREFOUR', label:'Carrefour', desde:'', hasta:''},
+  {key:'DIA',       label:'Dia',       desde:'', hasta:''},
+  {key:'LA_ANONIMA',label:'La Anónima',desde:'', hasta:''},
+  {key:'CENCO',     label:'Cenco',     desde:'', hasta:''},
+  {key:'VEA',       label:'Vea',       desde:'', hasta:''},
+];
+
 function setDin(v){
   tieneDin = v;
   document.getElementById('ro-din-si').classList.toggle('sel',v);
   document.getElementById('ro-din-no').classList.toggle('sel',!v);
 }
-function calcTotal(){
-  const ids = ['lo-bars','lo-burger','lo-mila','lo-chicken','lo-pork','lo-milk'];
-  const total = ids.reduce((s,id)=>s+(parseFloat(document.getElementById(id).value)||0),0);
-  document.getElementById('lo-total').value = Math.round(total);
+
+function buildTable(){
+  const tbody = document.getElementById('lo-tbody');
+  if(!tbody) return;
+  const inp = (id,ph='0') => `<input type="number" id="${id}" placeholder="${ph}" 
+    style="width:80px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;
+    color:var(--text);font-size:13px;padding:6px 8px;outline:none;-webkit-appearance:none"
+    oninput="calcRowTotal('${id.split('-')[0]}')" onfocus="this.select()">`;
+  const dateInp = (id) => `<input type="date" id="${id}" 
+    style="width:120px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;
+    color:var(--text);font-size:12px;padding:6px 8px;outline:none;color-scheme:dark">`;
+  
+  tbody.innerHTML = LO_CADENAS.map(c=>`
+    <tr id="row-${c.key}" style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 10px;font-weight:500;white-space:nowrap">${c.label}</td>
+      <td style="padding:6px 4px">${dateInp(c.key+'-desde')}</td>
+      <td style="padding:6px 4px">${dateInp(c.key+'-hasta')}</td>
+      <td style="padding:6px 4px">${inp(c.key+'-bars')}</td>
+      <td style="padding:6px 4px">${inp(c.key+'-burger')}</td>
+      <td style="padding:6px 4px">${inp(c.key+'-mila')}</td>
+      <td style="padding:6px 4px">${inp(c.key+'-chicken')}</td>
+      <td style="padding:6px 4px">${inp(c.key+'-pork')}</td>
+      <td style="padding:6px 4px">${inp(c.key+'-milk')}</td>
+      <td style="padding:6px 10px;font-family:monospace;font-weight:600;font-size:13px;color:var(--text2)" id="${c.key}-total">0</td>
+    </tr>`).join('');
 }
 
-async function saveLogyt(){
-  const cadena = document.getElementById('lo-cadena').value;
-  const label = document.getElementById('lo-label').value.trim();
-  const desde = document.getElementById('lo-desde').value;
-  const hasta = document.getElementById('lo-hasta').value;
-  if(!cadena||!label||!desde||!hasta){ toast('Completá todos los campos obligatorios','error'); return; }
+function calcRowTotal(key){
+  const prods = ['bars','burger','mila','chicken','pork','milk'];
+  const total = prods.reduce((s,p)=>{
+    const el = document.getElementById(key+'-'+p);
+    return s + (parseFloat(el?.value)||0);
+  },0);
+  const el = document.getElementById(key+'-total');
+  if(el) el.textContent = Math.round(total).toLocaleString('es-AR');
+}
 
-  const btn = document.getElementById('btn-lo');
+async function saveAllLogyt(){
+  const label = document.getElementById('lo-label').value.trim();
+  if(!label){ toast('Poné el período primero','error'); return; }
+
+  const btn = document.getElementById('btn-lo-all');
   btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Guardando...';
 
-  const g = id => parseFloat(document.getElementById(id).value)||0;
-  const bars=g('lo-bars'),burger=g('lo-burger'),mila=g('lo-mila'),chicken=g('lo-chicken'),pork=g('lo-pork'),milk=g('lo-milk');
+  const prods = ['bars','burger','mila','chicken','pork','milk'];
+  const g = id => parseFloat(document.getElementById(id)?.value)||0;
+  let saved = 0, errors = 0;
 
-  const r = await fetch(SUPABASE_URL+'/rest/v1/logyt_ventas',{
-    method:'POST',
-    headers:{...H,'Prefer':'return=minimal'},
-    body: JSON.stringify({cadena,periodo_label:label,fecha_desde:desde,fecha_hasta:hasta,tiene_dinamica:tieneDin,bars,burger,mila,chicken,pork,milk,total:bars+burger+mila+chicken+pork+milk})
-  });
+  for(const c of LO_CADENAS){
+    const desde = document.getElementById(c.key+'-desde')?.value;
+    const hasta = document.getElementById(c.key+'-hasta')?.value;
+    if(!desde || !hasta) continue; // saltar cadenas sin fecha
 
-  btn.disabled = false; btn.innerHTML = 'Guardar ventas';
-  if(r.ok){
-    toast('✓ Ventas guardadas');
-    ['lo-label','lo-desde','lo-hasta','lo-bars','lo-burger','lo-mila','lo-chicken','lo-pork','lo-milk','lo-total'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('lo-cadena').value='';
-    setDin(true);
-  } else { toast('Error al guardar','error'); }
+    const bars=g(c.key+'-bars'),burger=g(c.key+'-burger'),mila=g(c.key+'-mila'),
+          chicken=g(c.key+'-chicken'),pork=g(c.key+'-pork'),milk=g(c.key+'-milk');
+    const total = bars+burger+mila+chicken+pork+milk;
+    if(total===0) continue; // saltar cadenas sin datos
+
+    const r = await fetch(SUPABASE_URL+'/rest/v1/logyt_ventas',{
+      method:'POST',
+      headers:{...H,'Prefer':'return=minimal'},
+      body: JSON.stringify({cadena:c.key, periodo_label:label,
+        fecha_desde:desde, fecha_hasta:hasta,
+        tiene_dinamica:tieneDin,
+        bars,burger,mila,chicken,pork,milk,total})
+    });
+    if(r.ok) saved++; else errors++;
+  }
+
+  btn.disabled = false; btn.innerHTML = '⬆ Guardar todo';
+
+  if(saved>0) toast(`✓ ${saved} cadenas guardadas`);
+  if(errors>0) toast(`${errors} errores al guardar`,'error');
 }
+
+// Construir tabla al cargar
+document.addEventListener('DOMContentLoaded', buildTable);
 
 // =====================
 // HISTORIAL
