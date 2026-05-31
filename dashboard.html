@@ -245,7 +245,6 @@ async function fetchData(){
   }
 
   renderDin();
-  buildFindeSel();
   renderLogyt();
 }
 
@@ -320,6 +319,8 @@ function renderDin(){
 }
 
 function buildFindeSel(){
+  const el = document.getElementById('finde-sel');
+  if(!el) return;  // elemento no existe, salir sin error
   const cadenas = ['CARREFOUR','DIA','LA_ANONIMA','CENCO','VEA'];
   const allPeriods = [...new Set(LOGYT.map(d=>d.periodo_label))];
   if(allPeriods.length < 2){ document.getElementById('finde-sel').innerHTML=''; return; }
@@ -506,11 +507,13 @@ function renderTendencia(){
     const prodColors = {bars:'#1db97a',burger:'#6c63ff',mila:'#f5a623',chicken:'#e85d5d',pork:'#378ADD',milk:'#7ecfb0'};
     const prodNames = {bars:'Not Protein Bars',burger:'Not Burger',mila:'Not Mila',chicken:'Not Chicken',pork:'Not Pork',milk:'Not Milk'};
 
-    // Agrupar por periodo_label sumando todas las cadenas
+    // Agrupar por fecha_desde para evitar mezclar periodos de distintas cadenas
+    // Redondear cada registro a su semana (lunes) para agrupar correctamente
     const byPeriod = {};
     LOGYT.forEach(r=>{
-      const k = r.periodo_label||r.fecha_desde;
-      if(!byPeriod[k]) byPeriod[k]={label:k,fecha:r.fecha_desde,bars:0,burger:0,mila:0,chicken:0,pork:0,milk:0};
+      // Usar fecha_desde como clave, mostrar periodo_label como etiqueta
+      const k = r.fecha_desde||r.periodo_label;
+      if(!byPeriod[k]) byPeriod[k]={label:r.periodo_label||r.fecha_desde,fecha:k,bars:0,burger:0,mila:0,chicken:0,pork:0,milk:0};
       prods.forEach(p=>{ byPeriod[k][p]+=(r[p]||0); });
     });
     const periods = Object.values(byPeriod).sort((a,b)=>a.fecha>b.fecha?1:-1);
