@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notco — Market Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f0f1a;--surface:#1a1a2e;--surface2:#22223a;--surface3:#2a2a42;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#f0f0f8;--text2:rgba(240,240,248,0.55);--text3:rgba(240,240,248,0.28);
+  --green:#1db97a;--green-dim:rgba(29,185,122,0.12);--green-border:rgba(29,185,122,0.3);
+  --amber:#f5a623;--amber-dim:rgba(245,166,35,0.1);
+  --red:#e85d5d;--red-dim:rgba(232,93,93,0.1);
+  --blue:#6c63ff;--blue-dim:rgba(108,99,255,0.12);
+  --radius:14px;--radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.app{max-width:1200px;margin:0 auto;padding:0 24px}
+
+/* HEADER */
+.header{padding:28px 24px 0;background:var(--bg);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;max-width:1200px;margin:0 auto}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.logo-text{font-size:16px;font-weight:600;letter-spacing:-0.3px}
+.logo-sub{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}
+.last-update{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
+
+/* TABS */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border)}
+.tab{padding:10px 20px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;background:none;border-top:none;border-left:none;border-right:none;font-family:'DM Sans',sans-serif}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--green);border-bottom-color:var(--green)}
+
+/* PANELS */
+.panel{display:none;padding:24px 0}
+.panel.active{display:block}
+
+/* METRICS ROW */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:28px}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.metric-label{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px}
+.metric-val{font-size:26px;font-weight:600;letter-spacing:-1px}
+.metric-sub{font-size:12px;color:var(--text2);margin-top:4px}
+.up{color:var(--green)}.dn{color:var(--red)}.nt{color:var(--text2)}
+
+/* FILTERS */
+.filters{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.filters label{font-size:12px;color:var(--text2)}
+select{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',monospace;font-size:13px;padding:7px 12px;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none}
+select option{background:var(--surface)}
+.toggle-btn{padding:7px 14px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s}
+.toggle-btn.active{background:var(--blue-dim);border-color:rgba(108,99,255,0.4);color:#a09fff}
+
+/* CATEGORY BLOCKS */
+.cat-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden}
+.cat-header{padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.cat-emoji{font-size:18px}
+.cat-name{font-size:14px;font-weight:600;letter-spacing:-0.2px}
+.cat-count{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace;margin-left:auto}
+.brand-rows{}
+.brand-row{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);transition:background 0.1s}
+.brand-row:last-child{border-bottom:none}
+.brand-row:hover{background:var(--surface2)}
+.brand-name{font-size:13px;font-weight:500;min-width:120px;flex-shrink:0}
+.brand-notco{color:#a09fff}
+.notco-star{font-size:9px;vertical-align:super;margin-left:2px;color:#a09fff}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:11px;padding:4px 10px;border-radius:99px;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-family:'DM Mono',monospace;display:flex;align-items:center;gap:4px}
+.chip-pct{font-weight:600;color:var(--text)}
+
+/* LOGYT CARDS */
+.cadena-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.cadena-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.cadena-card-header{padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.cadena-name{font-size:14px;font-weight:600}
+.cadena-badge{font-size:12px;font-family:'DM Mono',monospace;font-weight:600;padding:4px 10px;border-radius:99px}
+.badge-up{background:var(--green-dim);color:var(--green);border:1px solid var(--green-border)}
+.badge-dn{background:var(--red-dim);color:var(--red);border:1px solid rgba(232,93,93,0.3)}
+.badge-nt{background:var(--surface2);color:var(--text2);border:1px solid var(--border2)}
+.cadena-body{padding:12px 16px}
+.prod-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
+.prod-row:last-child{border-bottom:none}
+.prod-name{color:var(--text2)}
+.prod-vals{display:flex;align-items:center;gap:8px}
+.prod-nums{color:var(--text3);font-family:'DM Mono',monospace;font-size:11px}
+.prod-var{font-family:'DM Mono',monospace;font-size:11px;font-weight:600}
+.vea-tag{font-size:10px;padding:2px 7px;border-radius:99px;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,166,35,0.3);margin-left:6px;font-family:'DM Mono',monospace}
+.prod-row-total{font-weight:600;font-size:13px;border-top:1px solid var(--border2)!important;margin-top:4px;padding-top:8px!important}
+
+/* TREND CHART */
+.chart-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px}
+.chart-title{font-size:13px;font-weight:600;margin-bottom:4px}
+.chart-sub{font-size:11px;color:var(--text2);margin-bottom:16px;font-family:'DM Mono',monospace}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:16px}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)}
+.legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* FINDE SELECTOR */
+.finde-selector{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.finde-btn{padding:8px 16px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:'DM Mono',monospace;transition:all 0.15s}
+.finde-btn.active{background:var(--blue-dim);border-color:rgba(108,99,255,0.4);color:#a09fff}
+
+/* LOADING */
+.loading{text-align:center;padding:60px 20px;color:var(--text2);font-size:13px}
+.spinner{width:24px;height:24px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* EMPTY */
+.empty{text-align:center;padding:40px;color:var(--text3);font-size:13px}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
+</style>
+</head>
+<body>
+
+<div style="background:var(--bg);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100">
+  <div style="max-width:1200px;margin:0 auto;padding:20px 24px 0">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="logo">
+        <div class="logo-dot"></div>
+        <div>
+          <div class="logo-text">Notco Market Dashboard</div>
+          <div class="logo-sub">Dinámicas + Performance LOGYT</div>
+        </div>
+      </div>
+      <div class="last-update" id="last-update">Cargando...</div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('dinamicas',this)">Dinámicas competencia</button>
+      <button class="tab" onclick="showTab('logyt',this)">Performance LOGYT</button>
+      <button class="tab" onclick="showTab('tendencia',this)">Tendencia por cadena</button>
+    </div>
+  </div>
+</div>
+
+<div style="max-width:1200px;margin:0 auto;padding:0 24px">
+
+  <!-- DINAMICAS -->
+  <div id="panel-dinamicas" class="panel active">
+    <div class="filters">
+      <label>Mes</label>
+      <select id="f-mes" onchange="renderDin()">
+        <option value="all">Todos los meses</option>
+        <option value="Marzo">Marzo</option>
+        <option value="Abril">Abril</option>
+        <option value="Mayo" selected>Mayo</option>
+      </select>
+      <label>Cadena</label>
+      <select id="f-cadena" onchange="renderDin()">
+        <option value="all">Todas</option>
+      </select>
+      <button class="toggle-btn active" id="btn-comp" onclick="toggleComp()">Solo competencia</button>
+      <button class="toggle-btn" id="btn-notco" onclick="toggleNotco()">Solo Notco</button>
+    </div>
+    <div id="din-content"><div class="loading"><div class="spinner"></div>Cargando dinámicas...</div></div>
+  </div>
+
+  <!-- LOGYT -->
+  <div id="panel-logyt" class="panel">
+    <div class="finde-selector" id="finde-sel"></div>
+    <div id="logyt-content"><div class="loading"><div class="spinner"></div>Cargando ventas...</div></div>
+  </div>
+
+  <!-- TENDENCIA -->
+  <div id="panel-tendencia" class="panel">
+    <div class="chart-section">
+      <div class="chart-title">Evolución de ventas totales por cadena</div>
+      <div class="chart-sub">Unidades vendidas por período de dinámica</div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#378ADD"></div>Carrefour</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#1db97a"></div>Dia</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#e85d5d"></div>La Anónima</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f5a623"></div>Cenco</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#a09fff;border:1px dashed #a09fff"></div>Vea</div>
+      </div>
+      <div style="position:relative;height:300px">
+        <canvas id="tendChart" role="img" aria-label="Evolución de ventas por cadena en los últimos findes"></canvas>
+      </div>
+    </div>
+    <div class="chart-section">
+      <div class="chart-title">Evolución por producto (todas las cadenas)</div>
+      <div class="chart-sub">Suma de unidades por producto por período</div>
+      <div class="legend" id="prod-legend"></div>
+      <div style="position:relative;height:280px">
+        <canvas id="prodChart" role="img" aria-label="Evolución de ventas por producto"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SUPABASE_URL = 'https://vpewylzugoetmxgxwtkv.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwZXd5bHp1Z29ldG14Z3h3dGt2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNjg4NTEsImV4cCI6MjA5NTc0NDg1MX0.rXOMrCJ2sCTeotzSJnQgzFsXECX2AyAIVFq6dHVulEU';
+const H = {'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'};
+
+const CATS = [
+  {key:'Milanesas de soja',emoji:'🥩',label:'Milanesas de soja'},
+  {key:'Reemplazo Carnico',emoji:'🍔',label:'Reemplazo cárnico'},
+  {key:'Medallones de granos',emoji:'🌾',label:'Medallones vegetales'},
+  {key:'Leches vegetales',emoji:'🥛',label:'Leches vegetales'},
+  {key:'Barras',emoji:'🍫',label:'Barras'},
+  {key:'Marca Completa',emoji:'⭐',label:'Marca completa'},
+];
+
+const PROD_LABELS = {BARS:'Barras',BURGER:'Not Burger',MILA:'Not Mila',CHICKEN:'Not Chicken',PORK:'Not Pork',MILK:'Not Milk'};
+const PROD_COLORS = {BARS:'#1db97a',BURGER:'#6c63ff',MILA:'#f5a623',CHICKEN:'#e85d5d',PORK:'#378ADD',MILK:'#7ecfb0'};
+const CADENA_COLORS = {CARREFOUR:'#378ADD',DIA:'#1db97a',LA_ANONIMA:'#e85d5d',CENCO:'#f5a623',VEA:'#a09fff'};
+
+let DIN = [], LOGYT = [];
+let filterComp = true, filterNotco = false;
+let selectedFinde = 0;
+let tendChart = null, prodChart = null;
+
+async function fetchData(){
+  const [d1, d2] = await Promise.all([
+    fetch(SUPABASE_URL+'/rest/v1/dinamicas_mercado?select=*&order=desde.asc',{headers:H}).then(r=>r.json()),
+    fetch(SUPABASE_URL+'/rest/v1/logyt_ventas?select=*&order=fecha_desde.asc',{headers:H}).then(r=>r.json()),
+  ]);
+  DIN = Array.isArray(d1) ? d1 : [];
+  LOGYT = Array.isArray(d2) ? d2 : [];
+
+  // Populate cadena filter
+  const banderas = [...new Set(DIN.map(d=>d.bandera))].sort();
+  const sel = document.getElementById('f-cadena');
+  banderas.forEach(b=>{
+    const o = document.createElement('option');
+    o.value = b; o.textContent = b;
+    sel.appendChild(o);
+  });
+
+  // Last update
+  if(DIN.length){
+    const last = DIN.reduce((a,b)=>a.hasta>b.hasta?a:b);
+    document.getElementById('last-update').textContent = 'Última dinámica: '+last.hasta;
+  }
+
+  renderDin();
+  buildFindeSel();
+  renderLogyt();
+}
+
+function showTab(id, btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='tendencia') renderTendencia();
+}
+
+function toggleComp(){
+  filterComp = !filterComp;
+  if(filterComp) filterNotco = false;
+  document.getElementById('btn-comp').classList.toggle('active', filterComp);
+  document.getElementById('btn-notco').classList.toggle('active', filterNotco);
+  renderDin();
+}
+function toggleNotco(){
+  filterNotco = !filterNotco;
+  if(filterNotco) filterComp = false;
+  document.getElementById('btn-comp').classList.toggle('active', filterComp);
+  document.getElementById('btn-notco').classList.toggle('active', filterNotco);
+  renderDin();
+}
+
+function renderDin(){
+  const mes = document.getElementById('f-mes').value;
+  const cadena = document.getElementById('f-cadena').value;
+
+  let data = DIN.filter(d=>{
+    if(mes!=='all' && d.mes!==mes) return false;
+    if(cadena!=='all' && d.bandera!==cadena) return false;
+    if(filterComp && d.es_notco) return false;
+    if(filterNotco && !d.es_notco) return false;
+    return true;
+  });
+
+  if(!data.length){
+    document.getElementById('din-content').innerHTML = '<div class="empty">Sin dinámicas para los filtros seleccionados.</div>';
+    return;
+  }
+
+  let html = '';
+  for(const cat of CATS){
+    const rows = data.filter(d=>d.categoria===cat.key);
+    if(!rows.length) continue;
+    const byMarca = {};
+    rows.forEach(r=>{
+      const k = r.marca;
+      if(!byMarca[k]) byMarca[k]={marca:r.marca,notco:r.es_notco,entries:[]};
+      byMarca[k].entries.push(r);
+    });
+    const total = Object.keys(byMarca).length;
+    html += `<div class="cat-block">
+      <div class="cat-header">
+        <span class="cat-emoji">${cat.emoji}</span>
+        <span class="cat-name">${cat.label}</span>
+        <span class="cat-count">${total} marca${total!==1?'s':''}</span>
+      </div>
+      <div class="brand-rows">`;
+    Object.values(byMarca).forEach(b=>{
+      const chips = b.entries.map(e=>`<span class="chip">${e.bandera} <span class="chip-pct">${Math.round(e.profundidad*100)}%</span></span>`).join('');
+      html += `<div class="brand-row">
+        <span class="brand-name ${b.notco?'brand-notco':''}">${b.marca}${b.notco?'<span class="notco-star">✦</span>':''}</span>
+        <div class="chips">${chips}</div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+  document.getElementById('din-content').innerHTML = html;
+}
+
+function buildFindeSel(){
+  const cadenas = ['CARREFOUR','DIA','LA_ANONIMA','CENCO','VEA'];
+  const allPeriods = [...new Set(LOGYT.map(d=>d.periodo_label))];
+  if(allPeriods.length < 2){ document.getElementById('finde-sel').innerHTML=''; return; }
+  let html = '<span style="font-size:12px;color:var(--text2);align-self:center">Comparar:</span>';
+  for(let i=0;i<allPeriods.length-1;i++){
+    html += `<button class="finde-btn ${i===selectedFinde?'active':''}" onclick="setFinde(${i},this)">${allPeriods[i]} → ${allPeriods[i+1]}</button>`;
+  }
+  document.getElementById('finde-sel').innerHTML = html;
+}
+
+function setFinde(i, btn){
+  selectedFinde = i;
+  document.querySelectorAll('.finde-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLogyt();
+}
+
+function renderLogyt(){
+  const allPeriods = [...new Set(LOGYT.map(d=>d.periodo_label))];
+  if(allPeriods.length < 2){
+    document.getElementById('logyt-content').innerHTML = '<div class="empty">Cargando datos de ventas...</div>';
+    return;
+  }
+  const pAnt = allPeriods[selectedFinde];
+  const pAct = allPeriods[selectedFinde+1];
+
+  const cadenas = [
+    {key:'CARREFOUR',label:'Carrefour'},
+    {key:'DIA',label:'Dia'},
+    {key:'LA_ANONIMA',label:'La Anónima'},
+    {key:'CENCO',label:'Cenco (Disco+Jumbo)'},
+    {key:'VEA',label:'Vea'},
+  ];
+
+  function getRow(cadena, periodo){
+    return LOGYT.find(d=>d.cadena===cadena && d.periodo_label===periodo);
+  }
+
+  function pct(a,b){ if(!a||!b) return null; return Math.round((b-a)/a*100); }
+  function fmtPct(v){ if(v===null) return '—'; return (v>0?'+':'')+v+'%'; }
+  function pctClass(v){ if(v===null) return 'nt'; return v>0?'up':'dn'; }
+  function fmt(n){ return n?Math.round(n).toLocaleString('es-AR'):'—'; }
+
+  // Summary metrics
+  let totalAnt=0, totalAct=0;
+  cadenas.forEach(c=>{
+    const a=getRow(c.key,pAnt), b=getRow(c.key,pAct);
+    if(a) totalAnt+=a.total||0;
+    if(b) totalAct+=b.total||0;
+  });
+  const totalVar = pct(totalAnt,totalAct);
+
+  let html = `<div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Total mercado</div>
+      <div class="metric-val ${pctClass(totalVar)}">${fmtPct(totalVar)}</div>
+      <div class="metric-sub">${fmt(totalAnt)} → ${fmt(totalAct)} uni</div>
+    </div>`;
+
+  const barsAnt = cadenas.reduce((s,c)=>{const r=getRow(c.key,pAnt);return s+(r?r.bars||0:0)},0);
+  const barsAct = cadenas.reduce((s,c)=>{const r=getRow(c.key,pAct);return s+(r?r.bars||0:0)},0);
+  const barsVar = pct(barsAnt,barsAct);
+  html += `<div class="metric">
+    <div class="metric-label">Barras</div>
+    <div class="metric-val ${pctClass(barsVar)}">${fmtPct(barsVar)}</div>
+    <div class="metric-sub">${fmt(barsAnt)} → ${fmt(barsAct)} uni</div>
+  </div>`;
+
+  const rcAnt = cadenas.reduce((s,c)=>{const r=getRow(c.key,pAnt);return s+(r?(r.burger||0)+(r.mila||0)+(r.chicken||0)+(r.pork||0):0)},0);
+  const rcAct = cadenas.reduce((s,c)=>{const r=getRow(c.key,pAct);return s+(r?(r.burger||0)+(r.mila||0)+(r.chicken||0)+(r.pork||0):0)},0);
+  const rcVar = pct(rcAnt,rcAct);
+  html += `<div class="metric">
+    <div class="metric-label">Reemplazo cárnico</div>
+    <div class="metric-val ${pctClass(rcVar)}">${fmtPct(rcVar)}</div>
+    <div class="metric-sub">${fmt(rcAnt)} → ${fmt(rcAct)} uni</div>
+  </div>`;
+
+  const veaAnt = getRow('VEA',pAnt), veaAct = getRow('VEA',pAct);
+  if(veaAct){
+    html += `<div class="metric">
+      <div class="metric-label">Vea</div>
+      <div class="metric-val ${veaAct.tiene_dinamica?'up':'dn'}">${veaAct.tiene_dinamica?'Con din.':'Sin din.'}</div>
+      <div class="metric-sub">${fmt(veaAnt?.total||0)} → ${fmt(veaAct.total||0)} uni</div>
+    </div>`;
+  }
+  html += '</div>';
+
+  // Cadena cards
+  html += '<div class="cadena-grid">';
+  cadenas.forEach(c=>{
+    const ant = getRow(c.key,pAnt), act = getRow(c.key,pAct);
+    if(!ant || !act) return;
+    const v = pct(ant.total,act.total);
+    const bclass = v>0?'badge-up':v<0?'badge-dn':'badge-nt';
+    const prods = ['bars','burger','mila','chicken','pork','milk'].filter(p=>ant[p]||act[p]);
+
+    let veaTag = c.key==='VEA'?`<span class="vea-tag">${act.tiene_dinamica?'con din.':'sin din.'}</span>`:'';
+
+    html += `<div class="cadena-card">
+      <div class="cadena-card-header">
+        <span class="cadena-name">${c.label}${veaTag}</span>
+        <span class="cadena-badge ${bclass}">${fmtPct(v)}</span>
+      </div>
+      <div class="cadena-body">
+        <div class="prod-row prod-row-total">
+          <span class="prod-name" style="color:var(--text);font-weight:600">Total</span>
+          <div class="prod-vals">
+            <span class="prod-nums">${fmt(ant.total)} → ${fmt(act.total)}</span>
+          </div>
+        </div>`;
+    prods.forEach(p=>{
+      const pv = pct(ant[p],act[p]);
+      html += `<div class="prod-row">
+        <span class="prod-name">${PROD_LABELS[p.toUpperCase()]||p}</span>
+        <div class="prod-vals">
+          <span class="prod-nums">${fmt(ant[p])} → ${fmt(act[p])}</span>
+          <span class="prod-var ${pctClass(pv)}">${fmtPct(pv)}</span>
+        </div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  });
+  html += '</div>';
+  document.getElementById('logyt-content').innerHTML = html;
+}
+
+function renderTendencia(){
+  const allPeriods = [...new Set(LOGYT.map(d=>d.periodo_label))];
+  const cadenas = [
+    {key:'CARREFOUR',label:'Carrefour',color:'#378ADD'},
+    {key:'DIA',label:'Dia',color:'#1db97a'},
+    {key:'LA_ANONIMA',label:'La Anónima',color:'#e85d5d'},
+    {key:'CENCO',label:'Cenco',color:'#f5a623'},
+    {key:'VEA',label:'Vea',color:'#a09fff'},
+  ];
+
+  function getRow(cad,per){ return LOGYT.find(d=>d.cadena===cad&&d.periodo_label===per); }
+
+  // Tendencia total
+  if(tendChart) tendChart.destroy();
+  tendChart = new Chart(document.getElementById('tendChart'),{
+    type:'line',
+    data:{
+      labels: allPeriods,
+      datasets: cadenas.map(c=>({
+        label:c.label,
+        data:allPeriods.map(p=>{ const r=getRow(c.key,p); return r?Math.round(r.total||0):null; }),
+        borderColor:c.color,
+        backgroundColor:c.color+'18',
+        tension:0.3,fill:false,
+        pointRadius:5,pointHoverRadius:7,
+        borderDash:c.key==='VEA'?[5,3]:undefined,
+        spanGaps:true,
+      }))
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${(ctx.parsed.y||0).toLocaleString('es-AR')} uni`}}},
+      scales:{
+        y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.4)',callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v,font:{size:11}}},
+        x:{grid:{display:false},ticks:{color:'rgba(240,240,248,0.4)',font:{size:11},maxRotation:30}}
+      }
+    }
+  });
+
+  // Por producto
+  const prods = ['bars','burger','mila','chicken','pork'];
+  const prodColors = {bars:'#1db97a',burger:'#6c63ff',mila:'#f5a623',chicken:'#e85d5d',pork:'#378ADD'};
+  const prodNames = {bars:'Barras',burger:'Not Burger',mila:'Not Mila',chicken:'Not Chicken',pork:'Not Pork'};
+
+  let legendHtml = prods.map(p=>`<div class="legend-item"><div class="legend-dot" style="background:${prodColors[p]}"></div>${prodNames[p]}</div>`).join('');
+  document.getElementById('prod-legend').innerHTML = legendHtml;
+
+  if(prodChart) prodChart.destroy();
+  prodChart = new Chart(document.getElementById('prodChart'),{
+    type:'line',
+    data:{
+      labels:allPeriods,
+      datasets:prods.map(p=>({
+        label:prodNames[p],
+        data:allPeriods.map(per=>{
+          return Math.round(LOGYT.filter(d=>d.periodo_label===per).reduce((s,r)=>s+(r[p]||0),0));
+        }),
+        borderColor:prodColors[p],
+        backgroundColor:prodColors[p]+'18',
+        tension:0.3,fill:false,
+        pointRadius:4,pointHoverRadius:6,
+      }))
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${(ctx.parsed.y||0).toLocaleString('es-AR')} uni`}}},
+      scales:{
+        y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.4)',callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v,font:{size:11}}},
+        x:{grid:{display:false},ticks:{color:'rgba(240,240,248,0.4)',font:{size:11},maxRotation:30}}
+      }
+    }
+  });
+}
+
+fetchData();
+</script>
+</body>
+</html>
