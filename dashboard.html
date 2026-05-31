@@ -347,21 +347,29 @@ function renderLogyt(){
     ];
     const PROD_LABELS = {bars:'Not Protein Bars',burger:'Not Burger',mila:'Not Mila',chicken:'Not Chicken',pork:'Not Pork',milk:'Not Milk'};
 
-    function getRows(cad){ return LOGYT.filter(d=>d.cadena===cad).sort((a,b)=>a.fecha_desde>b.fecha_desde?1:-1); }
+    function getRows(cad){ 
+      return LOGYT.filter(d=>(d.cadena||'').toUpperCase()===cad.toUpperCase())
+                  .sort((a,b)=>(a.fecha_desde||'')>(b.fecha_desde||'')?1:-1); 
+    }
     function pct(a,b){ if(!a||!b) return null; return Math.round((b-a)/a*100); }
     function fmtPct(v){ if(v===null) return '—'; return (v>0?'+':'')+v+'%'; }
     function pctClass(v){ if(v===null) return 'nt'; return v>0?'up':'dn'; }
     function fmt(n){ return n?Math.round(n).toLocaleString('es-AR'):'—'; }
 
-    if(!LOGYT.length){
-      document.getElementById('logyt-content').innerHTML = '<div class="empty">Sin datos de ventas cargados aún.</div>';
+    const el = document.getElementById('logyt-content');
+
+    if(!LOGYT || !LOGYT.length){
+      el.innerHTML = '<div class="empty">Sin datos de ventas. Cargá el Excel de LOGYT desde el admin.</div>';
       return;
     }
 
     let html = '<div class="cadena-grid">';
+    let hayAlgo = false;
+
     cadenas.forEach(c=>{
       const rows = getRows(c.key);
       if(!rows.length) return;
+      hayAlgo = true;
 
       const act = rows[rows.length-1];
       const ant = rows.length>1 ? rows[rows.length-2] : null;
@@ -369,15 +377,19 @@ function renderLogyt(){
       const bclass = v===null?'badge-nt':v>0?'badge-up':'badge-dn';
       const veaTag = c.key==='VEA' ? `<span class="vea-tag">${act.tiene_dinamica?'con din.':'sin din.'}</span>` : '';
 
+      // Períodos con fechas reales
+      const periodoAnt = ant ? (ant.periodo_label || ant.fecha_desde) : '—';
+      const periodoAct = act.periodo_label || act.fecha_desde;
+
       html += `<div class="cadena-card">
         <div class="cadena-card-header">
           <span class="cadena-name">${c.label}${veaTag}</span>
           <span class="cadena-badge ${bclass}">${fmtPct(v)}</span>
         </div>
         <div class="cadena-body">
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:11px;font-family:DM Mono,monospace;color:var(--text3)">
-            <span>${ant?ant.periodo_label:'—'}</span><span>→</span>
-            <span style="color:var(--text2)">${act.periodo_label}</span>
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:11px;font-family:monospace;color:var(--text3)">
+            <span>${periodoAnt}</span><span>→</span>
+            <span style="color:var(--text2)">${periodoAct}</span>
           </div>
           <div class="prod-row prod-row-total">
             <span class="prod-name" style="color:var(--text);font-weight:600">Total</span>
@@ -388,24 +400,27 @@ function renderLogyt(){
           </div>`;
 
       ['bars','burger','mila','chicken','pork','milk'].forEach(p=>{
-        if(!act[p] && !(ant&&ant[p])) return;
-        const pv = ant ? pct(ant[p], act[p]) : null;
+        const aval = act[p]||0;
+        const bval = ant ? (ant[p]||0) : 0;
+        if(!aval && !bval) return;
+        const pv = ant ? pct(bval, aval) : null;
         html += `<div class="prod-row">
           <span class="prod-name">${PROD_LABELS[p]}</span>
           <div class="prod-vals">
-            <span class="prod-nums">${ant?fmt(ant[p]):'—'} → ${fmt(act[p])}</span>
+            <span class="prod-nums">${ant?fmt(bval):'—'} → ${fmt(aval)}</span>
             <span class="prod-var ${pctClass(pv)}">${fmtPct(pv)}</span>
           </div>
         </div>`;
       });
 
+      // Historial
       if(rows.length>2){
         html += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">Historial</div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">Historial completo</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">`;
         rows.forEach(r=>{
           html += `<div style="font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 8px">
-            <span style="color:var(--text3)">${r.periodo_label}</span>
+            <span style="color:var(--text3)">${r.periodo_label||r.fecha_desde}</span>
             <span style="color:var(--text);margin-left:4px;font-weight:600">${fmt(r.total)}</span>
           </div>`;
         });
@@ -414,83 +429,119 @@ function renderLogyt(){
 
       html += '</div></div>';
     });
+
+    if(!hayAlgo){
+      el.innerHTML = '<div class="empty">Sin datos para mostrar.</div>';
+      return;
+    }
+
     html += '</div>';
-    document.getElementById('logyt-content').innerHTML = html;
+    el.innerHTML = html;
   }
 
 function renderTendencia(){
-  const allPeriods = [...new Set(LOGYT.map(d=>d.periodo_label))];
-  const cadenas = [
-    {key:'CARREFOUR',label:'Carrefour',color:'#378ADD'},
-    {key:'DIA',label:'Dia',color:'#1db97a'},
-    {key:'LA_ANONIMA',label:'La Anónima',color:'#e85d5d'},
-    {key:'CENCO',label:'Cenco',color:'#f5a623'},
-    {key:'VEA',label:'Vea',color:'#a09fff'},
-  ];
+    const cadenas = [
+      {key:'CARREFOUR',label:'Carrefour',color:'#378ADD'},
+      {key:'DIA',label:'Dia',color:'#1db97a'},
+      {key:'LA_ANONIMA',label:'La Anónima',color:'#e85d5d'},
+      {key:'CENCO',label:'Cenco',color:'#f5a623'},
+      {key:'VEA',label:'Vea',color:'#a09fff'},
+    ];
 
-  function getRow(cad,per){ return LOGYT.find(d=>d.cadena===cad&&d.periodo_label===per); }
+    if(!LOGYT.length) return;
 
-  // Tendencia total
-  if(tendChart) tendChart.destroy();
-  tendChart = new Chart(document.getElementById('tendChart'),{
-    type:'line',
-    data:{
-      labels: allPeriods,
-      datasets: cadenas.map(c=>({
-        label:c.label,
-        data:allPeriods.map(p=>{ const r=getRow(c.key,p); return r?Math.round(r.total||0):null; }),
-        borderColor:c.color,
-        backgroundColor:c.color+'18',
-        tension:0.3,fill:false,
-        pointRadius:5,pointHoverRadius:7,
-        borderDash:c.key==='VEA'?[5,3]:undefined,
-        spanGaps:true,
-      }))
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${(ctx.parsed.y||0).toLocaleString('es-AR')} uni`}}},
-      scales:{
-        y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.4)',callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v,font:{size:11}}},
-        x:{grid:{display:false},ticks:{color:'rgba(240,240,248,0.4)',font:{size:11},maxRotation:30}}
-      }
+    function getRows(cad){ 
+      return LOGYT.filter(d=>(d.cadena||'').toUpperCase()===cad.toUpperCase())
+                  .sort((a,b)=>(a.fecha_desde||'')>(b.fecha_desde||'')?1:-1); 
     }
-  });
+    function fmt(n){ return n?Math.round(n).toLocaleString('es-AR'):0; }
 
-  // Por producto
-  const prods = ['bars','burger','mila','chicken','pork','milk'];
-  const prodColors = {bars:'#1db97a',burger:'#6c63ff',mila:'#f5a623',chicken:'#e85d5d',pork:'#378ADD',milk:'#7ecfb0'};
-  const prodNames = {bars:'Not Protein Bars',burger:'Not Burger',mila:'Not Mila',chicken:'Not Chicken',pork:'Not Pork',milk:'Not Milk'};
+    // Usar periodo_label como labels, agrupados por cadena
+    // Cada cadena tiene sus propios labels — mostrar por cadena separado
 
-  let legendHtml = prods.map(p=>`<div class="legend-item"><div class="legend-dot" style="background:${prodColors[p]}"></div>${prodNames[p]}</div>`).join('');
-  document.getElementById('prod-legend').innerHTML = legendHtml;
-
-  if(prodChart) prodChart.destroy();
-  prodChart = new Chart(document.getElementById('prodChart'),{
-    type:'line',
-    data:{
-      labels:allPeriods,
-      datasets:prods.map(p=>({
-        label:prodNames[p],
-        data:allPeriods.map(per=>{
-          return Math.round(LOGYT.filter(d=>d.periodo_label===per).reduce((s,r)=>s+(r[p]||0),0));
-        }),
-        borderColor:prodColors[p],
-        backgroundColor:prodColors[p]+'18',
-        tension:0.3,fill:false,
-        pointRadius:4,pointHoverRadius:6,
-      }))
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${(ctx.parsed.y||0).toLocaleString('es-AR')} uni`}}},
-      scales:{
-        y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.4)',callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v,font:{size:11}}},
-        x:{grid:{display:false},ticks:{color:'rgba(240,240,248,0.4)',font:{size:11},maxRotation:30}}
+    // Gráfico 1: total por cadena (cada cadena con sus propios puntos)
+    if(tendChart) tendChart.destroy();
+    tendChart = new Chart(document.getElementById('tendChart'),{
+      type:'line',
+      data:{
+        labels: [],  // vacío, usamos datos individuales
+        datasets: cadenas.map(c=>{
+          const rows = getRows(c.key);
+          return {
+            label:c.label,
+            data: rows.map(r=>({x:r.fecha_desde, y:Math.round(r.total||0)})),
+            borderColor:c.color,
+            backgroundColor:c.color+'18',
+            tension:0.3, fill:false,
+            pointRadius:5, pointHoverRadius:7,
+            borderDash:c.key==='VEA'?[5,3]:undefined,
+          };
+        })
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{
+            label:ctx=>`${ctx.dataset.label}: ${fmt(ctx.parsed.y)} uni`,
+            title:ctx=>ctx[0]?.raw?.x||''
+          }}
+        },
+        scales:{
+          x:{
+            type:'category',
+            grid:{display:false},
+            ticks:{color:'rgba(240,240,248,0.4)',font:{size:10},maxRotation:30}
+          },
+          y:{
+            grid:{color:'rgba(255,255,255,0.04)'},
+            ticks:{color:'rgba(240,240,248,0.4)',callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v,font:{size:11}}
+          }
+        }
       }
-    }
-  });
-}
+    });
+
+    // Gráfico 2: por producto sumando todas las cadenas por fecha_desde
+    const prods = ['bars','burger','mila','chicken','pork','milk'];
+    const prodColors = {bars:'#1db97a',burger:'#6c63ff',mila:'#f5a623',chicken:'#e85d5d',pork:'#378ADD',milk:'#7ecfb0'};
+    const prodNames = {bars:'Not Protein Bars',burger:'Not Burger',mila:'Not Mila',chicken:'Not Chicken',pork:'Not Pork',milk:'Not Milk'};
+
+    // Agrupar por periodo_label sumando todas las cadenas
+    const byPeriod = {};
+    LOGYT.forEach(r=>{
+      const k = r.periodo_label||r.fecha_desde;
+      if(!byPeriod[k]) byPeriod[k]={label:k,fecha:r.fecha_desde,bars:0,burger:0,mila:0,chicken:0,pork:0,milk:0};
+      prods.forEach(p=>{ byPeriod[k][p]+=(r[p]||0); });
+    });
+    const periods = Object.values(byPeriod).sort((a,b)=>a.fecha>b.fecha?1:-1);
+
+    let legendHtml = prods.map(p=>`<div class="legend-item"><div class="legend-dot" style="background:${prodColors[p]}"></div>${prodNames[p]}</div>`).join('');
+    document.getElementById('prod-legend').innerHTML = legendHtml;
+
+    if(prodChart) prodChart.destroy();
+    prodChart = new Chart(document.getElementById('prodChart'),{
+      type:'line',
+      data:{
+        labels: periods.map(p=>p.label),
+        datasets: prods.map(p=>({
+          label:prodNames[p],
+          data:periods.map(r=>Math.round(r[p]||0)),
+          borderColor:prodColors[p],
+          backgroundColor:prodColors[p]+'18',
+          tension:0.3, fill:false,
+          pointRadius:4, pointHoverRadius:6,
+        }))
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmt(ctx.parsed.y)} uni`}}},
+        scales:{
+          y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.4)',callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v,font:{size:11}}},
+          x:{grid:{display:false},ticks:{color:'rgba(240,240,248,0.4)',font:{size:11},maxRotation:30}}
+        }
+      }
+    });
+  }
 
 fetchData();
 </script>
