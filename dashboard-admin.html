@@ -167,47 +167,42 @@ select option{background:var(--surface)}
     </div>
   </div>
 
-  <!-- LOGYT TABLA -->
+  <!-- LOGYT EXCEL SIMPLE -->
   <div id="panel-logyt" class="panel">
-    <div class="section-title">Cargar ventas LOGYT</div>
-    <div class="section-sub">Completá la tabla y guardá todo de una vez. Dejá en 0 los productos que no apliquen.</div>
+    <div class="section-title">Cargar ventas LOGYT desde Excel</div>
+    <div class="section-sub">Usá la plantilla plana. Cada semana agregás filas nuevas y subís el archivo — el sistema detecta solo los registros nuevos.</div>
 
-    <div class="card">
-      <div class="grid-2" style="margin-bottom:16px">
-        <div class="field" style="margin:0">
-          <label class="field-label">Período *</label>
-          <input type="text" id="lo-label" placeholder="Ej: 22-24 may">
-        </div>
-        <div class="field" style="margin:0">
-          <label class="field-label">¿Tienen dinámica Notco?</label>
-          <div class="radio-group" style="margin-top:4px">
-            <div class="radio-opt sel" id="ro-din-si" onclick="setDin(true)">Sí</div>
-            <div class="radio-opt" id="ro-din-no" onclick="setDin(false)">No</div>
-          </div>
-        </div>
+    <div class="drop-zone" id="drop-zone-lo">
+      <input type="file" accept=".xlsx,.xls" onchange="handleLogytFile(this.files[0])">
+      <div class="drop-icon" id="drop-icon-lo">📂</div>
+      <div class="drop-title" id="drop-title-lo">Arrastrá logyt_template.xlsx o hacé clic</div>
+      <div class="drop-sub" id="drop-sub-lo">Formato: una fila por cadena por período</div>
+    </div>
+
+    <div id="logyt-stats" style="display:none">
+      <div class="stats">
+        <div class="stat"><div class="stat-val" id="ls-bloques">0</div><div class="stat-label">Registros</div></div>
+        <div class="stat"><div class="stat-val" id="ls-cadenas">0</div><div class="stat-label">Cadenas</div></div>
+        <div class="stat"><div class="stat-val" id="ls-periodos">0</div><div class="stat-label">Períodos</div></div>
       </div>
+    </div>
 
-      <div style="overflow-x:auto;margin-bottom:16px">
-        <table id="lo-table" style="width:100%;border-collapse:collapse;font-size:13px">
-          <thead>
-            <tr>
-              <th style="text-align:left;padding:8px 10px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace;white-space:nowrap">Cadena</th>
-              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">Desde</th>
-              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">Hasta</th>
-              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">🍫 Barras</th>
-              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">🍔 Burger</th>
-              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">🥩 Mila</th>
-              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">🐔 Chicken</th>
-              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">🐷 Pork</th>
-              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">🥛 Milk</th>
-              <th style="padding:8px 6px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text2);font-size:11px;font-family:monospace">Total</th>
-            </tr>
-          </thead>
-          <tbody id="lo-tbody"></tbody>
-        </table>
+    <div id="logyt-preview-section" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:13px;font-weight:600">Vista previa</span>
+        <button class="btn-outline" onclick="clearLogytFile()">✕ Limpiar</button>
       </div>
-
-      <button class="btn" onclick="saveAllLogyt()" id="btn-lo-all">⬆ Guardar todo</button>
+      <div class="preview-wrap">
+        <table id="logyt-preview-table"></table>
+      </div>
+      <div class="progress-wrap" id="lo-progress-wrap">
+        <div class="progress-label" id="lo-progress-label">Subiendo...</div>
+        <div class="progress-bar"><div class="progress-fill" id="lo-progress-fill" style="width:0%"></div></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" onclick="uploadLogyt()" id="btn-lo-upload">⬆ Subir a Supabase</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px;font-family:DM Mono,monospace">Los registros duplicados (misma cadena + período) se omiten automáticamente.</div>
     </div>
   </div>
 
@@ -405,98 +400,161 @@ dz.addEventListener('dragleave', ()=>dz.classList.remove('drag'));
 dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
 
 // =====================
-// LOGYT TABLA
+// LOGYT EXCEL SIMPLE
 // =====================
-const LO_CADENAS = [
-  {key:'CARREFOUR', label:'Carrefour', desde:'', hasta:''},
-  {key:'DIA',       label:'Dia',       desde:'', hasta:''},
-  {key:'LA_ANONIMA',label:'La Anónima',desde:'', hasta:''},
-  {key:'CENCO',     label:'Cenco',     desde:'', hasta:''},
-  {key:'VEA',       label:'Vea',       desde:'', hasta:''},
-];
+let parsedLogytRows = [];
 
 function setDin(v){
   tieneDin = v;
-  document.getElementById('ro-din-si').classList.toggle('sel',v);
-  document.getElementById('ro-din-no').classList.toggle('sel',!v);
+  document.getElementById('ro-din-si')?.classList.toggle('sel',v);
+  document.getElementById('ro-din-no')?.classList.toggle('sel',!v);
 }
 
-function buildTable(){
-  const tbody = document.getElementById('lo-tbody');
-  if(!tbody) return;
-  const inp = (id,ph='0') => `<input type="number" id="${id}" placeholder="${ph}" 
-    style="width:80px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;
-    color:var(--text);font-size:13px;padding:6px 8px;outline:none;-webkit-appearance:none"
-    oninput="calcRowTotal('${id.split('-')[0]}')" onfocus="this.select()">`;
-  const dateInp = (id) => `<input type="date" id="${id}" 
-    style="width:120px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;
-    color:var(--text);font-size:12px;padding:6px 8px;outline:none;color-scheme:dark">`;
-  
-  tbody.innerHTML = LO_CADENAS.map(c=>`
-    <tr id="row-${c.key}" style="border-bottom:1px solid var(--border)">
-      <td style="padding:8px 10px;font-weight:500;white-space:nowrap">${c.label}</td>
-      <td style="padding:6px 4px">${dateInp(c.key+'-desde')}</td>
-      <td style="padding:6px 4px">${dateInp(c.key+'-hasta')}</td>
-      <td style="padding:6px 4px">${inp(c.key+'-bars')}</td>
-      <td style="padding:6px 4px">${inp(c.key+'-burger')}</td>
-      <td style="padding:6px 4px">${inp(c.key+'-mila')}</td>
-      <td style="padding:6px 4px">${inp(c.key+'-chicken')}</td>
-      <td style="padding:6px 4px">${inp(c.key+'-pork')}</td>
-      <td style="padding:6px 4px">${inp(c.key+'-milk')}</td>
-      <td style="padding:6px 10px;font-family:monospace;font-weight:600;font-size:13px;color:var(--text2)" id="${c.key}-total">0</td>
-    </tr>`).join('');
+function handleLogytFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, dateNF:'yyyy-mm-dd', defval:''});
+      
+      parsedLogytRows = [];
+      const CADENA_MAP = {
+        'CARREFOUR':'CARREFOUR','DIA':'DIA','LA_ANONIMA':'LA_ANONIMA',
+        'CENCO':'CENCO','VEA':'VEA',
+        'CARREFOUR':'CARREFOUR','DIA':'DIA',
+        'LA ANONIMA':'LA_ANONIMA','LA ANÓNIMA':'LA_ANONIMA',
+        'CENCO (DISCO+JUMBO)':'CENCO',
+      };
+      
+      for(let i=1; i<raw.length; i++){
+        const r = raw[i];
+        if(!r || !r[0] || !r[1]) continue;
+        const cadenaRaw = String(r[0]).trim().toUpperCase();
+        // Buscar cadena en el mapa
+        let cadena = CADENA_MAP[cadenaRaw];
+        if(!cadena){
+          // Intentar match parcial
+          for(const [k,v] of Object.entries(CADENA_MAP)){
+            if(cadenaRaw.includes(k)) { cadena = v; break; }
+          }
+        }
+        if(!cadena) continue;
+        
+        const label = String(r[1]||'').trim();
+        const desde = String(r[2]||'').trim().slice(0,10);
+        const hasta = String(r[3]||'').trim().slice(0,10);
+        if(!label || !desde || desde.length < 8) continue;
+        
+        const g = idx => parseFloat(String(r[idx]||'0').replace(',','.')) || 0;
+        const bars=g(4), burger=g(5), mila=g(6), chicken=g(7), pork=g(8), milk=g(9);
+        const total = bars+burger+mila+chicken+pork+milk;
+        if(total === 0) continue;
+        
+        parsedLogytRows.push({
+          cadena, periodo_label:label, fecha_desde:desde, fecha_hasta:hasta||desde,
+          tiene_dinamica:true, bars, burger, mila, chicken, pork, milk,
+          total: Math.round(total*100)/100
+        });
+      }
+      
+      if(!parsedLogytRows.length){ toast('No se encontraron datos válidos','error'); return; }
+      showLogytPreview(file.name);
+    } catch(err){ toast('Error: '+err.message,'error'); }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
-function calcRowTotal(key){
-  const prods = ['bars','burger','mila','chicken','pork','milk'];
-  const total = prods.reduce((s,p)=>{
-    const el = document.getElementById(key+'-'+p);
-    return s + (parseFloat(el?.value)||0);
-  },0);
-  const el = document.getElementById(key+'-total');
-  if(el) el.textContent = Math.round(total).toLocaleString('es-AR');
+function showLogytPreview(filename){
+  const dz = document.getElementById('drop-zone-lo');
+  dz.classList.add('loaded');
+  document.getElementById('drop-icon-lo').textContent = '✅';
+  document.getElementById('drop-title-lo').textContent = filename;
+  document.getElementById('drop-sub-lo').textContent = parsedLogytRows.length+' registros detectados';
+
+  const cadenas = new Set(parsedLogytRows.map(r=>r.cadena)).size;
+  const periodos = new Set(parsedLogytRows.map(r=>r.periodo_label)).size;
+  document.getElementById('ls-bloques').textContent = parsedLogytRows.length;
+  document.getElementById('ls-cadenas').textContent = cadenas;
+  document.getElementById('ls-periodos').textContent = periodos;
+  document.getElementById('logyt-stats').style.display = 'block';
+
+  let html = `<tr><th>Cadena</th><th>Período</th><th>Barras</th><th>Burger</th><th>Mila</th><th>Chicken</th><th>Pork</th><th>Milk</th><th>Total</th></tr>`;
+  parsedLogytRows.forEach(r=>{
+    html += `<tr>
+      <td style="font-weight:500">${r.cadena}</td>
+      <td style="font-family:DM Mono,monospace">${r.periodo_label}</td>
+      <td>${r.bars?Math.round(r.bars).toLocaleString('es-AR'):'—'}</td>
+      <td>${r.burger?Math.round(r.burger).toLocaleString('es-AR'):'—'}</td>
+      <td>${r.mila?Math.round(r.mila).toLocaleString('es-AR'):'—'}</td>
+      <td>${r.chicken?Math.round(r.chicken).toLocaleString('es-AR'):'—'}</td>
+      <td>${r.pork?Math.round(r.pork).toLocaleString('es-AR'):'—'}</td>
+      <td>${r.milk?Math.round(r.milk).toLocaleString('es-AR'):'—'}</td>
+      <td style="font-weight:600">${Math.round(r.total).toLocaleString('es-AR')}</td>
+    </tr>`;
+  });
+  document.getElementById('logyt-preview-table').innerHTML = html;
+  document.getElementById('logyt-preview-section').style.display = 'block';
 }
 
-async function saveAllLogyt(){
-  const label = document.getElementById('lo-label').value.trim();
-  if(!label){ toast('Poné el período primero','error'); return; }
+function clearLogytFile(){
+  parsedLogytRows = [];
+  const dz = document.getElementById('drop-zone-lo');
+  dz.classList.remove('loaded');
+  document.getElementById('drop-icon-lo').textContent = '📂';
+  document.getElementById('drop-title-lo').textContent = 'Arrastrá logyt_template.xlsx o hacé clic';
+  document.getElementById('drop-sub-lo').textContent = 'Formato: una fila por cadena por período';
+  document.getElementById('logyt-stats').style.display = 'none';
+  document.getElementById('logyt-preview-section').style.display = 'none';
+}
 
-  const btn = document.getElementById('btn-lo-all');
-  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Guardando...';
+async function uploadLogyt(){
+  if(!parsedLogytRows.length) return;
+  const btn = document.getElementById('btn-lo-upload');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Subiendo...';
+  const pw = document.getElementById('lo-progress-wrap');
+  const pf = document.getElementById('lo-progress-fill');
+  const pl = document.getElementById('lo-progress-label');
+  pw.style.display = 'block';
 
-  const prods = ['bars','burger','mila','chicken','pork','milk'];
-  const g = id => parseFloat(document.getElementById(id)?.value)||0;
-  let saved = 0, errors = 0;
+  pl.textContent = 'Verificando duplicados...';
+  const existing = await fetch(SUPABASE_URL+'/rest/v1/logyt_ventas?select=cadena,periodo_label',{headers:H}).then(r=>r.json());
+  const existingKeys = new Set((Array.isArray(existing)?existing:[]).map(e=>`${e.cadena}|${e.periodo_label}`));
+  const toUpload = parsedLogytRows.filter(r=>!existingKeys.has(`${r.cadena}|${r.periodo_label}`));
 
-  for(const c of LO_CADENAS){
-    const desde = document.getElementById(c.key+'-desde')?.value;
-    const hasta = document.getElementById(c.key+'-hasta')?.value;
-    if(!desde || !hasta) continue; // saltar cadenas sin fecha
-
-    const bars=g(c.key+'-bars'),burger=g(c.key+'-burger'),mila=g(c.key+'-mila'),
-          chicken=g(c.key+'-chicken'),pork=g(c.key+'-pork'),milk=g(c.key+'-milk');
-    const total = bars+burger+mila+chicken+pork+milk;
-    if(total===0) continue; // saltar cadenas sin datos
-
-    const r = await fetch(SUPABASE_URL+'/rest/v1/logyt_ventas',{
-      method:'POST',
-      headers:{...H,'Prefer':'return=minimal'},
-      body: JSON.stringify({cadena:c.key, periodo_label:label,
-        fecha_desde:desde, fecha_hasta:hasta,
-        tiene_dinamica:tieneDin,
-        bars,burger,mila,chicken,pork,milk,total})
-    });
-    if(r.ok) saved++; else errors++;
+  if(!toUpload.length){
+    toast('Todos los registros ya existen','error');
+    btn.disabled=false; btn.innerHTML='⬆ Subir a Supabase';
+    pw.style.display='none'; return;
   }
 
-  btn.disabled = false; btn.innerHTML = '⬆ Guardar todo';
+  let uploaded = 0;
+  for(let i=0; i<toUpload.length; i++){
+    pl.textContent = `Subiendo ${i+1} de ${toUpload.length}...`;
+    pf.style.width = Math.round((i/toUpload.length)*100)+'%';
+    const r = await fetch(SUPABASE_URL+'/rest/v1/logyt_ventas',{
+      method:'POST', headers:{...H,'Prefer':'return=minimal'},
+      body: JSON.stringify(toUpload[i])
+    });
+    if(r.ok) uploaded++; else { toast('Error en fila '+i,'error'); break; }
+  }
 
-  if(saved>0) toast(`✓ ${saved} cadenas guardadas`);
-  if(errors>0) toast(`${errors} errores al guardar`,'error');
+  pf.style.width='100%';
+  pl.textContent=`✓ ${uploaded} registros subidos (${parsedLogytRows.length-toUpload.length} duplicados omitidos)`;
+  toast(`✓ ${uploaded} registros de ventas subidos`);
+  btn.disabled=false; btn.innerHTML='⬆ Subir a Supabase';
 }
 
-// Construir tabla al cargar
-document.addEventListener('DOMContentLoaded', buildTable);
+// Drag & drop
+document.addEventListener('DOMContentLoaded', ()=>{
+  const dzlo = document.getElementById('drop-zone-lo');
+  if(dzlo){
+    dzlo.addEventListener('dragover',e=>{e.preventDefault();dzlo.classList.add('drag');});
+    dzlo.addEventListener('dragleave',()=>dzlo.classList.remove('drag'));
+    dzlo.addEventListener('drop',e=>{e.preventDefault();dzlo.classList.remove('drag');handleLogytFile(e.dataTransfer.files[0]);});
+  }
+});
 
 // =====================
 // HISTORIAL
