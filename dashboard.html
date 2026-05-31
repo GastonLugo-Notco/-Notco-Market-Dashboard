@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -277,7 +278,7 @@ function renderDin(){
   const cadena = document.getElementById('f-cadena').value;
 
   let data = DIN.filter(d=>{
-    if(mes!=='all' && d.mes!==mes) return false;
+    if(mes!=='all' && (d.mes||'').toLowerCase()!==mes.toLowerCase()) return false;
     if(cadena!=='all' && d.bandera!==cadena) return false;
     if(filterComp && d.es_notco) return false;
     if(filterNotco && !d.es_notco) return false;
