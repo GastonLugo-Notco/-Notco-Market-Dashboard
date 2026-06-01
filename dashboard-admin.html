@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -411,99 +412,54 @@ function handleLogytFile(file){
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      const wb = XLSX.read(e.target.result, {type:'array'});
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const raw = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, dateNF:'yyyy-mm-dd', defval:''});
-      
+      const raw = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
       parsedLogytRows = [];
       const CADENA_MAP = {
         'CARREFOUR':'CARREFOUR','DIA':'DIA','LA_ANONIMA':'LA_ANONIMA',
         'CENCO':'CENCO','VEA':'VEA',
-        'CARREFOUR':'CARREFOUR','DIA':'DIA',
         'LA ANONIMA':'LA_ANONIMA','LA ANÓNIMA':'LA_ANONIMA',
         'CENCO (DISCO+JUMBO)':'CENCO',
       };
-      
-      for(let i=1; i<raw.length; i++){
-        const r = raw[i];
-        if(!r || !r[0] || !r[1]) continue;
-        const cadenaRaw = String(r[0]).trim().toUpperCase();
-        // Buscar cadena en el mapa
-        let cadena = CADENA_MAP[cadenaRaw];
-        if(!cadena){
-          // Intentar match parcial
-          for(const [k,v] of Object.entries(CADENA_MAP)){
-            if(cadenaRaw.includes(k)) { cadena = v; break; }
-          }
+      function toDateStr(v){
+        if(!v) return '';
+        if(typeof v==='number'){
+          const d=new Date(Math.round((v-25569)*86400*1000));
+          return d.toISOString().slice(0,10);
         }
-        if(!cadena) continue;
-        
-        if(String(r[0]||'').startsWith('──') || String(r[0]||'').startsWith('📋')) continue;
-        const label = String(r[1]||'').trim();
-        const desde = String(r[2]||'').trim().slice(0,10);
-        const hasta = String(r[3]||'').trim().slice(0,10);
-        if(!label || !desde || desde.length < 8) continue;
-        
-        const g = idx => parseFloat(String(r[idx]||'0').replace(',','.')) || 0;
-        const bars=g(4), burger=g(5), mila=g(6), chicken=g(7), pork=g(8), milk=g(9);
-        const total = bars+burger+mila+chicken+pork+milk;
-        
-        parsedLogytRows.push({
-          cadena, periodo_label:label, fecha_desde:desde, fecha_hasta:hasta||desde,
-          tiene_dinamica:true, bars, burger, mila, chicken, pork, milk,
-          total: Math.round(total*100)/100
-        });
+        return String(v).slice(0,10);
       }
-      
-      if(!parsedLogytRows.length){ toast('No se encontraron datos válidos','error'); return; }
+      function toNum(v){
+        if(v===null||v===undefined||v==='') return 0;
+        if(typeof v==='number') return v;
+        return parseFloat(String(v).replace(/[^0-9.-]/g,''))||0;
+      }
+      for(let i=1;i<raw.length;i++){
+        const r=raw[i];
+        if(!r||r[0]===null||r[0]===undefined||r[0]==='') continue;
+        const cadenaRaw=String(r[0]).trim().toUpperCase();
+        if(cadenaRaw.startsWith('──')||cadenaRaw.startsWith('📋')) continue;
+        let cadena=CADENA_MAP[cadenaRaw];
+        if(!cadena){ for(const [k,v] of Object.entries(CADENA_MAP)){ if(cadenaRaw.includes(k)){cadena=v;break;} } }
+        if(!cadena) continue;
+        const label=r[1]?String(r[1]).trim():'';
+        if(!label) continue;
+        const desde=toDateStr(r[2]);
+        const hasta=toDateStr(r[3])||desde;
+        if(!desde||desde.length<8) continue;
+        const bars=toNum(r[4]),burger=toNum(r[5]),mila=toNum(r[6]),chicken=toNum(r[7]),pork=toNum(r[8]),milk=toNum(r[9]);
+        parsedLogytRows.push({cadena,periodo_label:label,fecha_desde:desde,fecha_hasta:hasta,
+          tiene_dinamica:true,bars,burger,mila,chicken,pork,milk,
+          total:Math.round((bars+burger+mila+chicken+pork+milk)*100)/100});
+      }
+      if(!parsedLogytRows.length){toast('No se encontraron datos válidos','error');return;}
       showLogytPreview(file.name);
-    } catch(err){ toast('Error: '+err.message,'error'); }
+    } catch(err){toast('Error: '+err.message,'error');}
   };
   reader.readAsArrayBuffer(file);
 }
 
-function showLogytPreview(filename){
-  const dz = document.getElementById('drop-zone-lo');
-  dz.classList.add('loaded');
-  document.getElementById('drop-icon-lo').textContent = '✅';
-  document.getElementById('drop-title-lo').textContent = filename;
-  document.getElementById('drop-sub-lo').textContent = parsedLogytRows.length+' registros detectados';
-
-  const cadenas = new Set(parsedLogytRows.map(r=>r.cadena)).size;
-  const periodos = new Set(parsedLogytRows.map(r=>r.periodo_label)).size;
-  document.getElementById('ls-bloques').textContent = parsedLogytRows.length;
-  document.getElementById('ls-cadenas').textContent = cadenas;
-  document.getElementById('ls-periodos').textContent = periodos;
-  document.getElementById('logyt-stats').style.display = 'block';
-
-  let html = `<tr><th>Cadena</th><th>Período</th><th>Barras</th><th>Burger</th><th>Mila</th><th>Chicken</th><th>Pork</th><th>Milk</th><th>Total</th></tr>`;
-  parsedLogytRows.forEach(r=>{
-    html += `<tr>
-      <td style="font-weight:500">${r.cadena}</td>
-      <td style="font-family:DM Mono,monospace">${r.periodo_label}</td>
-      <td>${r.bars?Math.round(r.bars).toLocaleString('es-AR'):'—'}</td>
-      <td>${r.burger?Math.round(r.burger).toLocaleString('es-AR'):'—'}</td>
-      <td>${r.mila?Math.round(r.mila).toLocaleString('es-AR'):'—'}</td>
-      <td>${r.chicken?Math.round(r.chicken).toLocaleString('es-AR'):'—'}</td>
-      <td>${r.pork?Math.round(r.pork).toLocaleString('es-AR'):'—'}</td>
-      <td>${r.milk?Math.round(r.milk).toLocaleString('es-AR'):'—'}</td>
-      <td style="font-weight:600">${Math.round(r.total).toLocaleString('es-AR')}</td>
-    </tr>`;
-  });
-  document.getElementById('logyt-preview-table').innerHTML = html;
-  document.getElementById('logyt-preview-section').style.display = 'block';
-}
-
-function clearLogytFile(){
-  parsedLogytRows = [];
-  const dz = document.getElementById('drop-zone-lo');
-  dz.classList.remove('loaded');
-  document.getElementById('drop-icon-lo').textContent = '📂';
-  document.getElementById('drop-title-lo').textContent = 'Arrastrá logyt_template.xlsx o hacé clic';
-  document.getElementById('drop-sub-lo').textContent = 'Formato: una fila por cadena por período';
-  document.getElementById('logyt-stats').style.display = 'none';
-  document.getElementById('logyt-preview-section').style.display = 'none';
-}
 
 async function uploadLogyt(){
   if(!parsedLogytRows.length) return;
