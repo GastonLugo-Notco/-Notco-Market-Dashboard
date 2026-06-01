@@ -130,8 +130,8 @@ select option{background:var(--surface)}
     <div class="section-title">Cargar dinámicas desde Excel</div>
     <div class="section-sub">Subí el mismo Excel que completás cada semana. Se lee automáticamente la hoja "Dinamicas" y se suben todos los registros nuevos a Supabase de una sola vez.</div>
 
-    <div class="drop-zone" id="drop-zone">
-      <input type="file" accept=".xlsx,.xls" onchange="handleFile(this.files[0])">
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-din').click()" style="cursor:pointer">
+      <input type="file" id="file-din" accept=".xlsx,.xls" onchange="handleFile(this.files[0])" style="display:none">
       <div class="drop-icon" id="drop-icon">📂</div>
       <div class="drop-title" id="drop-title">Arrastrá el Excel o hacé clic para seleccionar</div>
       <div class="drop-sub" id="drop-sub">Publicaciones_Clientes_2025.xlsx · Hoja "Dinamicas"</div>
@@ -172,8 +172,8 @@ select option{background:var(--surface)}
     <div class="section-title">Cargar ventas LOGYT desde Excel</div>
     <div class="section-sub">Usá la plantilla plana. Cada semana agregás filas nuevas y subís el archivo — el sistema detecta solo los registros nuevos.</div>
 
-    <div class="drop-zone" id="drop-zone-lo">
-      <input type="file" accept=".xlsx,.xls" onchange="handleLogytFile(this.files[0])">
+    <div class="drop-zone" id="drop-zone-lo" onclick="document.getElementById('file-lo').click()" style="cursor:pointer">
+      <input type="file" id="file-lo" accept=".xlsx,.xls" onchange="handleLogytFile(this.files[0])" style="display:none">
       <div class="drop-icon" id="drop-icon-lo">📂</div>
       <div class="drop-title" id="drop-title-lo">Arrastrá logyt_template.xlsx o hacé clic</div>
       <div class="drop-sub" id="drop-sub-lo">Formato: una fila por cadena por período</div>
@@ -615,7 +615,7 @@ async function delLogyt(id,btn){ if(!confirm('¿Eliminar?')) return; btn.textCon
 // =====================
 // LOGYT EXCEL PARSER
 // =====================
-let parsedLogytRows = [];
+parsedLogytRows = [];
 
 const PROD_MAP_LO = {
   'NOTPROTEINBARS':'bars','NOTMILK':'milk',
