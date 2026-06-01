@@ -278,6 +278,18 @@ function renderDin(){
       return true;
     });
 
+    // Reclasificar: Reemplazo Carnico -> Medallones (excepto Not Mila -> Milanesas de soja)
+    data = data.map(d=>{
+      if(d.categoria==='Reemplazo Carnico'){
+        const desc = (d.descripcion||'').toLowerCase();
+        if(desc.includes('mila') || desc.includes('not mila')){
+          return {...d, categoria:'Milanesas de soja'};
+        }
+        return {...d, categoria:'Medallones de granos'};
+      }
+      return d;
+    });
+
     if(!data.length){
       document.getElementById('din-content').innerHTML = '<div class="empty">Sin dinámicas para los filtros seleccionados.</div>';
       return;
@@ -285,8 +297,7 @@ function renderDin(){
 
     // Agrupar por categoría
     const CATS = [
-      {key:'Milanesas de soja',emoji:'🥩',label:'Milanesas de soja'},
-      {key:'Reemplazo Carnico',emoji:'🍔',label:'Reemplazo cárnico'},
+      {key:'Milanesas de soja',emoji:'🌱',label:'Milanesas de soja'},
       {key:'Medallones de granos',emoji:'🌾',label:'Medallones vegetales'},
       {key:'Leches vegetales',emoji:'🥛',label:'Leches vegetales'},
       {key:'Barras',emoji:'🍫',label:'Barras'},
@@ -336,7 +347,7 @@ function renderDin(){
 
         const chips = Object.values(byCadena).map(c=>{
           const prof = c.profs.length===1 ? c.profs[0] : Math.max(...c.profs);
-          const repeat = c.count>1 ? `<span style="font-size:9px;opacity:0.6;margin-left:2px">x${c.count}</span>` : '';
+          const repeat = c.count>1 ? `<span style="font-size:10px;font-weight:600;color:var(--amber);margin-left:3px" title="${c.count} veces en el mes">×${c.count}</span>` : '';
           return `<span class="chip">${c.bandera} <span class="chip-pct">${prof}%</span>${repeat}</span>`;
         }).join('');
 
