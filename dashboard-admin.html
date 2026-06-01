@@ -442,6 +442,7 @@ function handleLogytFile(file){
         }
         if(!cadena) continue;
         
+        if(String(r[0]||'').startsWith('──') || String(r[0]||'').startsWith('📋')) continue;
         const label = String(r[1]||'').trim();
         const desde = String(r[2]||'').trim().slice(0,10);
         const hasta = String(r[3]||'').trim().slice(0,10);
@@ -450,7 +451,6 @@ function handleLogytFile(file){
         const g = idx => parseFloat(String(r[idx]||'0').replace(',','.')) || 0;
         const bars=g(4), burger=g(5), mila=g(6), chicken=g(7), pork=g(8), milk=g(9);
         const total = bars+burger+mila+chicken+pork+milk;
-        if(total === 0) continue;
         
         parsedLogytRows.push({
           cadena, periodo_label:label, fecha_desde:desde, fecha_hasta:hasta||desde,
