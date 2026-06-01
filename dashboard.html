@@ -448,34 +448,41 @@ function renderTendencia(){
       {key:'CENCO',label:'Cenco',color:'#f5a623'},
       {key:'VEA',label:'Vea',color:'#a09fff'},
     ];
-
     if(!LOGYT.length) return;
 
-    function getRows(cad){ 
+    function getRows(cad){
       return LOGYT.filter(d=>(d.cadena||'').toUpperCase()===cad.toUpperCase())
-                  .sort((a,b)=>(a.fecha_desde||'')>(b.fecha_desde||'')?1:-1); 
+                  .sort((a,b)=>(a.fecha_desde||'')>(b.fecha_desde||'')?1:-1);
     }
-    function fmt(n){ return n?Math.round(n).toLocaleString('es-AR'):0; }
 
-    // Usar periodo_label como labels, agrupados por cadena
-    // Cada cadena tiene sus propios labels — mostrar por cadena separado
+    // Obtener todos los labels de semana únicos ordenados
+    const allLabels = [...new Set(LOGYT.map(d=>d.periodo_label))]
+      .sort((a,b)=>{
+        // Ordenar por número de semana
+        const na = parseInt(a.replace(/[^0-9]/g,''))||0;
+        const nb = parseInt(b.replace(/[^0-9]/g,''))||0;
+        return na-nb;
+      });
 
-    // Gráfico 1: total por cadena (cada cadena con sus propios puntos)
+    // Gráfico 1: total por cadena usando periodo_label como eje X
     if(tendChart) tendChart.destroy();
     tendChart = new Chart(document.getElementById('tendChart'),{
       type:'line',
       data:{
-        labels: [],  // vacío, usamos datos individuales
+        labels: allLabels,
         datasets: cadenas.map(c=>{
           const rows = getRows(c.key);
+          const rowMap = {};
+          rows.forEach(r=>{ rowMap[r.periodo_label] = Math.round(r.total||0); });
           return {
             label:c.label,
-            data: rows.map(r=>({x:r.fecha_desde, y:Math.round(r.total||0)})),
+            data: allLabels.map(l=>rowMap[l]||null),
             borderColor:c.color,
             backgroundColor:c.color+'18',
             tension:0.3, fill:false,
             pointRadius:5, pointHoverRadius:7,
             borderDash:c.key==='VEA'?[5,3]:undefined,
+            spanGaps:true,
           };
         })
       },
@@ -483,52 +490,40 @@ function renderTendencia(){
         responsive:true, maintainAspectRatio:false,
         plugins:{
           legend:{display:false},
-          tooltip:{callbacks:{
-            label:ctx=>`${ctx.dataset.label}: ${fmt(ctx.parsed.y)} uni`,
-            title:ctx=>ctx[0]?.raw?.x||''
-          }}
+          tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${(ctx.parsed.y||0).toLocaleString('es-AR')} uni`}}
         },
         scales:{
-          x:{
-            type:'category',
-            grid:{display:false},
-            ticks:{color:'rgba(240,240,248,0.4)',font:{size:10},maxRotation:30}
-          },
-          y:{
-            grid:{color:'rgba(255,255,255,0.04)'},
-            ticks:{color:'rgba(240,240,248,0.4)',callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v,font:{size:11}}
-          }
+          x:{grid:{display:false},ticks:{color:'rgba(240,240,248,0.4)',font:{size:11}}},
+          y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.4)',callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v,font:{size:11}}}
         }
       }
     });
 
-    // Gráfico 2: por producto sumando todas las cadenas por fecha_desde
+    // Gráfico 2: por producto sumando todas las cadenas por periodo_label
     const prods = ['bars','burger','mila','chicken','pork','milk'];
     const prodColors = {bars:'#1db97a',burger:'#6c63ff',mila:'#f5a623',chicken:'#e85d5d',pork:'#378ADD',milk:'#7ecfb0'};
     const prodNames = {bars:'Not Protein Bars',burger:'Not Burger',mila:'Not Mila',chicken:'Not Chicken',pork:'Not Pork',milk:'Not Milk'};
 
-    // Agrupar por fecha_desde para evitar mezclar periodos de distintas cadenas
-    // Redondear cada registro a su semana (lunes) para agrupar correctamente
-    const byPeriod = {};
+    const byLabel = {};
+    allLabels.forEach(l=>{ byLabel[l]={bars:0,burger:0,mila:0,chicken:0,pork:0,milk:0}; });
     LOGYT.forEach(r=>{
-      // Usar fecha_desde como clave, mostrar periodo_label como etiqueta
-      const k = r.fecha_desde||r.periodo_label;
-      if(!byPeriod[k]) byPeriod[k]={label:r.periodo_label||r.fecha_desde,fecha:k,bars:0,burger:0,mila:0,chicken:0,pork:0,milk:0};
-      prods.forEach(p=>{ byPeriod[k][p]+=(r[p]||0); });
+      const l = r.periodo_label;
+      if(!byLabel[l]) byLabel[l]={bars:0,burger:0,mila:0,chicken:0,pork:0,milk:0};
+      prods.forEach(p=>{ byLabel[l][p]+=(r[p]||0); });
     });
-    const periods = Object.values(byPeriod).sort((a,b)=>a.fecha>b.fecha?1:-1);
 
-    let legendHtml = prods.map(p=>`<div class="legend-item"><div class="legend-dot" style="background:${prodColors[p]}"></div>${prodNames[p]}</div>`).join('');
-    document.getElementById('prod-legend').innerHTML = legendHtml;
+    document.getElementById('prod-legend').innerHTML = prods.map(p=>
+      `<div class="legend-item"><div class="legend-dot" style="background:${prodColors[p]}"></div>${prodNames[p]}</div>`
+    ).join('');
 
     if(prodChart) prodChart.destroy();
     prodChart = new Chart(document.getElementById('prodChart'),{
       type:'line',
       data:{
-        labels: periods.map(p=>p.label),
+        labels: allLabels,
         datasets: prods.map(p=>({
           label:prodNames[p],
-          data:periods.map(r=>Math.round(r[p]||0)),
+          data: allLabels.map(l=>Math.round(byLabel[l]?.[p]||0)),
           borderColor:prodColors[p],
           backgroundColor:prodColors[p]+'18',
           tension:0.3, fill:false,
@@ -537,10 +532,10 @@ function renderTendencia(){
       },
       options:{
         responsive:true, maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmt(ctx.parsed.y)} uni`}}},
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${(ctx.parsed.y||0).toLocaleString('es-AR')} uni`}}},
         scales:{
-          y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.4)',callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v,font:{size:11}}},
-          x:{grid:{display:false},ticks:{color:'rgba(240,240,248,0.4)',font:{size:11},maxRotation:30}}
+          x:{grid:{display:false},ticks:{color:'rgba(240,240,248,0.4)',font:{size:11}}},
+          y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.4)',callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v,font:{size:11}}}
         }
       }
     });
