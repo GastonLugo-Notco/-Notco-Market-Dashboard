@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notco Dashboard — Admin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f0f1a;--surface:#1a1a2e;--surface2:#22223a;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#f0f0f8;--text2:rgba(240,240,248,0.55);--text3:rgba(240,240,248,0.28);
+  --green:#1db97a;--green-dim:rgba(29,185,122,0.12);--green-border:rgba(29,185,122,0.3);
+  --amber:#f5a623;--amber-dim:rgba(245,166,35,0.1);
+  --red:#e85d5d;--red-dim:rgba(232,93,93,0.1);
+  --blue:#6c63ff;--blue-dim:rgba(108,99,255,0.12);
+  --radius:14px;--radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.app{max-width:900px;margin:0 auto;padding:24px}
+.header{margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.logo-text{font-size:16px;font-weight:600;letter-spacing:-0.3px}
+.logo-sub{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}
+.badge-admin{font-size:11px;padding:4px 12px;border-radius:99px;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,166,35,0.3);font-family:'DM Mono',monospace}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:24px}
+.tab{padding:10px 20px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;background:none;border-top:none;border-left:none;border-right:none;font-family:'DM Sans',sans-serif}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+.panel{display:none}.panel.active{display:block}
+.section-title{font-size:14px;font-weight:600;margin-bottom:4px}
+.section-sub{font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.5}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+
+/* DROP ZONE */
+.drop-zone{border:2px dashed var(--border2);border-radius:var(--radius);padding:40px 20px;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;margin-bottom:16px}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--amber);background:var(--amber-dim)}
+.drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-icon{font-size:36px;margin-bottom:10px}
+.drop-title{font-size:15px;font-weight:600;margin-bottom:4px}
+.drop-sub{font-size:12px;color:var(--text2)}
+.drop-zone.loaded{border-color:var(--green);background:var(--green-dim)}
+.drop-zone.loaded .drop-icon::after{content:'✓'}
+
+/* PREVIEW TABLE */
+.preview-wrap{overflow-x:auto;margin-bottom:16px;border:1px solid var(--border);border-radius:var(--radius-sm)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--surface2);padding:8px 12px;text-align:left;font-size:11px;font-family:'DM Mono',monospace;color:var(--text2);border-bottom:1px solid var(--border);font-weight:500;white-space:nowrap}
+td{padding:7px 12px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface2)}
+.notco-row td:first-child{border-left:2px solid rgba(108,99,255,0.5)}
+.badge{font-size:10px;padding:2px 7px;border-radius:99px;font-family:'DM Mono',monospace;font-weight:500}
+.badge-notco{background:var(--blue-dim);color:#a09fff;border:1px solid rgba(108,99,255,0.3)}
+.badge-comp{background:var(--surface2);color:var(--text2);border:1px solid var(--border2)}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--surface2);border-radius:var(--radius-sm);padding:12px;text-align:center}
+.stat-val{font-size:22px;font-weight:600;font-family:'DM Mono',monospace}
+.stat-label{font-size:10px;color:var(--text2);margin-top:2px;text-transform:uppercase;letter-spacing:0.5px}
+
+/* PROGRESS */
+.progress-wrap{margin-bottom:16px;display:none}
+.progress-label{font-size:12px;color:var(--text2);margin-bottom:6px;font-family:'DM Mono',monospace}
+.progress-bar{height:4px;background:var(--border);border-radius:99px;overflow:hidden}
+.progress-fill{height:100%;background:var(--green);border-radius:99px;transition:width 0.3s}
+
+/* BUTTONS */
+.btn{width:100%;padding:13px;border:none;border-radius:var(--radius);background:var(--green);color:#0f0f1a;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn:active{transform:scale(0.98)}.btn:disabled{opacity:0.4;cursor:not-allowed}
+.btn-amber{background:var(--amber)}
+.btn-outline{background:transparent;border:1px solid var(--border2);color:var(--text2);width:auto;padding:8px 16px}
+.btn-row{display:flex;gap:10px;margin-top:12px}
+
+/* LOGYT FORM */
+.field{margin-bottom:14px}.field:last-child{margin-bottom:0}
+.field-label{font-size:12px;color:var(--text2);margin-bottom:6px;display:block;font-family:'DM Mono',monospace}
+input,select{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;padding:9px 12px;outline:none;transition:border-color 0.2s;-webkit-appearance:none}
+input[type=date]{color-scheme:dark}
+input:focus,select:focus{border-color:var(--amber)}
+select option{background:var(--surface)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.radio-group{display:flex;gap:8px}
+.radio-opt{flex:1;padding:9px;text-align:center;border-radius:var(--radius-sm);border:1px solid var(--border2);font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);background:var(--surface2);transition:all 0.15s}
+.radio-opt.sel{background:var(--green-dim);color:var(--green);border-color:var(--green-border)}
+.divider{height:1px;background:var(--border);margin:16px 0}
+
+/* HISTORIAL */
+.data-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;font-size:12px}
+.btn-del{background:transparent;border:none;color:var(--red);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;opacity:0.6}
+.btn-del:hover{opacity:1}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:12px 18px;font-size:13px;z-index:999;transform:translateY(80px);opacity:0;transition:all 0.3s;max-width:320px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:var(--green-border);color:var(--green)}
+.toast.error{border-color:rgba(232,93,93,0.4);color:var(--red)}
+.spinner{width:16px;height:16px;border:2px solid rgba(15,15,26,0.3);border-top-color:#0f0f1a;border-radius:50%;animation:spin 0.7s linear infinite}
+.spinner-white{border-color:rgba(255,255,255,0.2);border-top-color:var(--text)}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">
+      <div class="logo-dot"></div>
+      <div>
+        <div class="logo-text">Notco Market Dashboard</div>
+        <div class="logo-sub">Panel de administración</div>
+      </div>
+    </div>
+    <span class="badge-admin">ADMIN</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('din',this)">📊 Dinámicas (Excel)</button>
+    <button class="tab" onclick="showTab('logyt',this)">📈 Ventas LOGYT (Excel)</button>
+    <button class="tab" onclick="showTab('historial',this)">🗂 Historial</button>
+  </div>
+
+  <!-- DINÁMICAS DESDE EXCEL -->
+  <div id="panel-din" class="panel active">
+    <div class="section-title">Cargar dinámicas desde Excel</div>
+    <div class="section-sub">Subí el mismo Excel que completás cada semana. Se lee automáticamente la hoja "Dinamicas" y se suben todos los registros nuevos a Supabase de una sola vez.</div>
+
+    <div class="drop-zone" id="drop-zone" style="position:relative;cursor:pointer">
+      <input type="file" id="file-din" accept=".xlsx,.xls" onchange="handleFile(this.files[0])" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:10">
+      <div class="drop-icon" id="drop-icon">📂</div>
+      <div class="drop-title" id="drop-title">Arrastrá el Excel o hacé clic para seleccionar</div>
+      <div class="drop-sub" id="drop-sub">Publicaciones_Clientes_2025.xlsx · Hoja "Dinamicas"</div>
+    </div>
+
+    <div id="stats-row" style="display:none">
+      <div class="stats">
+        <div class="stat"><div class="stat-val" id="s-total">0</div><div class="stat-label">Registros</div></div>
+        <div class="stat"><div class="stat-val" id="s-notco" style="color:#a09fff">0</div><div class="stat-label">Notco</div></div>
+        <div class="stat"><div class="stat-val" id="s-comp">0</div><div class="stat-label">Competencia</div></div>
+        <div class="stat"><div class="stat-val" id="s-cadenas">0</div><div class="stat-label">Cadenas</div></div>
+      </div>
+    </div>
+
+    <div id="preview-section" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:13px;font-weight:600">Vista previa <span id="preview-count" style="color:var(--text2);font-weight:400;font-size:12px"></span></span>
+        <button class="btn-outline" onclick="clearFile()">✕ Limpiar</button>
+      </div>
+      <div class="preview-wrap">
+        <table id="preview-table"></table>
+      </div>
+
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-label" id="progress-label">Subiendo registros...</div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-amber" onclick="uploadDinamicas()" id="btn-upload">⬆ Subir todo a Supabase</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px;font-family:'DM Mono',monospace">Los registros duplicados (misma bandera + marca + fecha) se omiten automáticamente.</div>
+    </div>
+  </div>
+
+  <!-- LOGYT EXCEL SIMPLE -->
+  <div id="panel-logyt" class="panel">
+    <div class="section-title">Cargar ventas LOGYT</div>
+    <div class="section-sub" style="margin-bottom:20px">Seleccioná el Excel con la plantilla completada.</div>
+
+    <input type="file" id="file-lo-simple" accept=".xlsx,.xls" style="display:none" onchange="handleLogytFile(this.files[0])">
+    
+    <button onclick="document.getElementById('file-lo-simple').click()" 
+      style="width:100%;padding:20px;background:var(--surface);border:2px dashed var(--border2);border-radius:var(--radius);color:var(--text);font-size:16px;cursor:pointer;font-family:DM Sans,sans-serif;margin-bottom:16px">
+      📂 Seleccionar Excel de ventas
+    </button>
+
+    <div id="logyt-stats" style="display:none;margin-bottom:16px">
+      <div class="stats">
+        <div class="stat"><div class="stat-val" id="ls-bloques">0</div><div class="stat-label">Registros</div></div>
+        <div class="stat"><div class="stat-val" id="ls-cadenas">0</div><div class="stat-label">Cadenas</div></div>
+        <div class="stat"><div class="stat-val" id="ls-periodos">0</div><div class="stat-label">Períodos</div></div>
+      </div>
+    </div>
+
+    <div id="logyt-preview-section" style="display:none">
+      <div class="preview-wrap" style="margin-bottom:16px">
+        <table id="logyt-preview-table"></table>
+      </div>
+      <div class="progress-wrap" id="lo-progress-wrap">
+        <div class="progress-label" id="lo-progress-label">Subiendo...</div>
+        <div class="progress-bar"><div class="progress-fill" id="lo-progress-fill" style="width:0%"></div></div>
+      </div>
+      <button class="btn" onclick="uploadLogyt()" id="btn-lo-upload">⬆ Subir a Supabase</button>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px">Los duplicados se omiten automáticamente.</div>
+    </div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div id="panel-historial" class="panel">
+    <div class="section-title">Historial de registros</div>
+    <div class="section-sub">Últimas dinámicas y ventas cargadas. Podés eliminar registros duplicados o erróneos.</div>
+    <div id="hist-content"><div style="color:var(--text2);font-size:13px;display:flex;align-items:center;gap:8px"><div class="spinner spinner-white"></div> Cargando...</div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://vpewylzugoetmxgxwtkv.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwZXd5bHp1Z29ldG14Z3h3dGt2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNjg4NTEsImV4cCI6MjA5NTc0NDg1MX0.rXOMrCJ2sCTeotzSJnQgzFsXECX2AyAIVFq6dHVulEU';
+const H = {'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'};
+
+let parsedRows = [];
+let tieneDin = true;
+
+// =====================
+// EXCEL HANDLER
+// =====================
+function handleFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      const ws = wb.Sheets['Dinamicas'] || wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, dateNF:'yyyy-mm-dd'});
+
+      parsedRows = [];
+      const NOTCO_NAMES = ['notco','Notco','NOTCO'];
+
+      for(let i=1; i<raw.length; i++){
+        const r = raw[i];
+        if(!r || !r[2] || !r[3]) continue;
+        const marca = String(r[3]||'').trim();
+        const profRaw = r[6];
+        let prof = 0;
+        if(profRaw !== undefined && profRaw !== ''){
+          prof = parseFloat(String(profRaw).replace(',','.'));
+          if(prof > 1) prof = prof / 100;
+        }
+        const desde = fmtDate(r[7]);
+        const hasta = fmtDate(r[8]);
+        if(!desde || !hasta) continue;
+
+        parsedRows.push({
+          año: parseInt(r[0]) || new Date().getFullYear(),
+          mes: String(r[1]||'').trim(),
+          bandera: String(r[2]||'').trim(),
+          marca: marca,
+          es_notco: NOTCO_NAMES.includes(marca),
+          categoria: String(r[4]||'').trim(),
+          descripcion: String(r[5]||'').trim(),
+          profundidad: prof,
+          desde, hasta
+        });
+      }
+
+      if(!parsedRows.length){ toast('No se encontraron datos en la hoja "Dinamicas"','error'); return; }
+
+      showPreview(file.name);
+    } catch(err){
+      toast('Error al leer el Excel: '+err.message,'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function fmtDate(val){
+  if(val===null||val===undefined||val==='') return null;
+  const s = String(val).trim();
+  // Ya viene como yyyy-mm-dd (formato ideal del Excel)
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  // Si es número serial de Excel
+  if(typeof val === 'number'){
+    const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    return d.toISOString().slice(0,10);
+  }
+  // Formato dd/mm/yyyy
+  if(s.includes('/')){
+    const parts = s.split('/');
+    if(parts.length===3){
+      const d=parts[0].padStart(2,'0'), m=parts[1].padStart(2,'0'), y=parts[2].length===2?'20'+parts[2]:parts[2];
+      return `${y}-${m}-${d}`;
+    }
+  }
+  return null;
+}
+
+function showPreview(filename){
+  const dropZone = document.getElementById('drop-zone');
+  dropZone.classList.add('loaded');
+  document.getElementById('drop-icon').textContent = '✅';
+  document.getElementById('drop-title').textContent = filename;
+  document.getElementById('drop-sub').textContent = parsedRows.length + ' registros encontrados';
+
+  const notcoCount = parsedRows.filter(r=>r.es_notco).length;
+  const cadenas = new Set(parsedRows.map(r=>r.bandera)).size;
+  document.getElementById('s-total').textContent = parsedRows.length;
+  document.getElementById('s-notco').textContent = notcoCount;
+  document.getElementById('s-comp').textContent = parsedRows.length - notcoCount;
+  document.getElementById('s-cadenas').textContent = cadenas;
+  document.getElementById('stats-row').style.display = 'block';
+
+  const preview = parsedRows.slice(0,10);
+  document.getElementById('preview-count').textContent = `(mostrando ${preview.length} de ${parsedRows.length})`;
+  let html = `<tr><th>Bandera</th><th>Marca</th><th>Categoría</th><th>Descripción</th><th>Prof.</th><th>Desde</th><th>Hasta</th></tr>`;
+  preview.forEach(r=>{
+    html += `<tr class="${r.es_notco?'notco-row':''}">
+      <td>${r.bandera}</td>
+      <td>${r.marca} ${r.es_notco?'<span class="badge badge-notco">Notco</span>':'<span class="badge badge-comp">Comp.</span>'}</td>
+      <td>${r.categoria}</td>
+      <td>${r.descripcion||'—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:600">${Math.round(r.profundidad*100)}%</td>
+      <td style="font-family:'DM Mono',monospace">${r.desde}</td>
+      <td style="font-family:'DM Mono',monospace">${r.hasta}</td>
+    </tr>`;
+  });
+  if(parsedRows.length > 10) html += `<tr><td colspan="7" style="color:var(--text3);text-align:center;font-style:italic">... y ${parsedRows.length-10} registros más</td></tr>`;
+  document.getElementById('preview-table').innerHTML = html;
+  document.getElementById('preview-section').style.display = 'block';
+}
+
+function clearFile(){
+  parsedRows = [];
+  const dz = document.getElementById('drop-zone');
+  dz.classList.remove('loaded');
+  document.getElementById('drop-icon').textContent = '📂';
+  document.getElementById('drop-title').textContent = 'Arrastrá el Excel o hacé clic para seleccionar';
+  document.getElementById('drop-sub').textContent = 'Publicaciones_Clientes_2025.xlsx · Hoja "Dinamicas"';
+  document.getElementById('stats-row').style.display = 'none';
+  document.getElementById('preview-section').style.display = 'none';
+}
+
+async function uploadDinamicas(){
+  if(!parsedRows.length) return;
+  const btn = document.getElementById('btn-upload');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Subiendo...';
+
+  const pw = document.getElementById('progress-wrap');
+  const pf = document.getElementById('progress-fill');
+  const pl = document.getElementById('progress-label');
+  pw.style.display = 'block';
+
+  // Fetch existing to avoid duplicates
+  pl.textContent = 'Verificando duplicados...';
+  const existing = await fetch(SUPABASE_URL+'/rest/v1/dinamicas_mercado?select=bandera,marca,desde,hasta',{headers:H}).then(r=>r.json());
+  const existingKeys = new Set(existing.map(e=>`${e.bandera}|${e.marca}|${e.desde}|${e.hasta}`));
+
+  const toUpload = parsedRows.filter(r=>{
+    const k = `${r.bandera}|${r.marca}|${r.desde}|${r.hasta}`;
+    return !existingKeys.has(k);
+  });
+
+  if(!toUpload.length){
+    toast('Todos los registros ya existen en Supabase — sin duplicados','error');
+    btn.disabled = false; btn.innerHTML = '⬆ Subir todo a Supabase';
+    pw.style.display = 'none';
+    return;
+  }
+
+  // Upload in batches of 50
+  const BATCH = 50;
+  let uploaded = 0;
+  for(let i=0; i<toUpload.length; i+=BATCH){
+    const batch = toUpload.slice(i, i+BATCH);
+    pl.textContent = `Subiendo ${Math.min(i+BATCH, toUpload.length)} de ${toUpload.length}...`;
+    pf.style.width = Math.round((i/toUpload.length)*100)+'%';
+    const r = await fetch(SUPABASE_URL+'/rest/v1/dinamicas_mercado',{
+      method:'POST',
+      headers:{...H,'Prefer':'return=minimal'},
+      body: JSON.stringify(batch)
+    });
+    if(!r.ok){ toast('Error en lote '+i,'error'); break; }
+    uploaded += batch.length;
+  }
+
+  pf.style.width = '100%';
+  pl.textContent = `✓ ${uploaded} registros subidos (${parsedRows.length - toUpload.length} duplicados omitidos)`;
+  toast(`✓ ${uploaded} dinámicas subidas a Supabase`);
+  btn.disabled = false;
+  btn.innerHTML = '⬆ Subir todo a Supabase';
+}
+
+// Drag & drop
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', ()=>dz.classList.remove('drag'));
+dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
+
+// =====================
+// LOGYT EXCEL SIMPLE
+// =====================
+let parsedLogytRows = [];
+
+function setDin(v){
+  tieneDin = v;
+  document.getElementById('ro-din-si')?.classList.toggle('sel',v);
+  document.getElementById('ro-din-no')?.classList.toggle('sel',!v);
+}
+
+function handleLogytFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, dateNF:'yyyy-mm-dd', defval:''});
+      
+      parsedLogytRows = [];
+      const CADENA_MAP = {
+        'CARREFOUR':'CARREFOUR','DIA':'DIA','LA_ANONIMA':'LA_ANONIMA',
+        'CENCO':'CENCO','VEA':'VEA',
+        'CARREFOUR':'CARREFOUR','DIA':'DIA',
+        'LA ANONIMA':'LA_ANONIMA','LA ANÓNIMA':'LA_ANONIMA',
+        'CENCO (DISCO+JUMBO)':'CENCO',
+      };
+      
+      for(let i=1; i<raw.length; i++){
+        const r = raw[i];
+        if(!r || !r[0] || !r[1]) continue;
+        const cadenaRaw = String(r[0]).trim().toUpperCase();
+        // Buscar cadena en el mapa
+        let cadena = CADENA_MAP[cadenaRaw];
+        if(!cadena){
+          // Intentar match parcial
+          for(const [k,v] of Object.entries(CADENA_MAP)){
+            if(cadenaRaw.includes(k)) { cadena = v; break; }
+          }
+        }
+        if(!cadena) continue;
+        
+        if(String(r[0]||'').startsWith('──') || String(r[0]||'').startsWith('📋')) continue;
+        const label = String(r[1]||'').trim();
+        const desde = String(r[2]||'').trim().slice(0,10);
+        const hasta = String(r[3]||'').trim().slice(0,10);
+        if(!label || !desde || desde.length < 8) continue;
+        
+        const g = idx => parseFloat(String(r[idx]||'0').replace(',','.')) || 0;
+        const bars=g(4), burger=g(5), mila=g(6), chicken=g(7), pork=g(8), milk=g(9);
+        const total = bars+burger+mila+chicken+pork+milk;
+        
+        parsedLogytRows.push({
+          cadena, periodo_label:label, fecha_desde:desde, fecha_hasta:hasta||desde,
+          tiene_dinamica:true, bars, burger, mila, chicken, pork, milk,
+          total: Math.round(total*100)/100
+        });
+      }
+      
+      if(!parsedLogytRows.length){ toast('No se encontraron datos válidos','error'); return; }
+      showLogytPreview(file.name);
+    } catch(err){ toast('Error: '+err.message,'error'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showLogytPreview(filename){
+  const dz = document.getElementById('drop-zone-lo');
+  dz.classList.add('loaded');
+  document.getElementById('drop-icon-lo').textContent = '✅';
+  document.getElementById('drop-title-lo').textContent = filename;
+  document.getElementById('drop-sub-lo').textContent = parsedLogytRows.length+' registros detectados';
+
+  const cadenas = new Set(parsedLogytRows.map(r=>r.cadena)).size;
+  const periodos = new Set(parsedLogytRows.map(r=>r.periodo_label)).size;
+  document.getElementById('ls-bloques').textContent = parsedLogytRows.length;
+  document.getElementById('ls-cadenas').textContent = cadenas;
+  document.getElementById('ls-periodos').textContent = periodos;
+  document.getElementById('logyt-stats').style.display = 'block';
+
+  let html = `<tr><th>Cadena</th><th>Período</th><th>Barras</th><th>Burger</th><th>Mila</th><th>Chicken</th><th>Pork</th><th>Milk</th><th>Total</th></tr>`;
+  parsedLogytRows.forEach(r=>{
+    html += `<tr>
+      <td style="font-weight:500">${r.cadena}</td>
+      <td style="font-family:DM Mono,monospace">${r.periodo_label}</td>
+      <td>${r.bars?Math.round(r.bars).toLocaleString('es-AR'):'—'}</td>
+      <td>${r.burger?Math.round(r.burger).toLocaleString('es-AR'):'—'}</td>
+      <td>${r.mila?Math.round(r.mila).toLocaleString('es-AR'):'—'}</td>
+      <td>${r.chicken?Math.round(r.chicken).toLocaleString('es-AR'):'—'}</td>
+      <td>${r.pork?Math.round(r.pork).toLocaleString('es-AR'):'—'}</td>
+      <td>${r.milk?Math.round(r.milk).toLocaleString('es-AR'):'—'}</td>
+      <td style="font-weight:600">${Math.round(r.total).toLocaleString('es-AR')}</td>
+    </tr>`;
+  });
+  document.getElementById('logyt-preview-table').innerHTML = html;
+  document.getElementById('logyt-preview-section').style.display = 'block';
+}
+
+function clearLogytFile(){
+  parsedLogytRows = [];
+  const dz = document.getElementById('drop-zone-lo');
+  dz.classList.remove('loaded');
+  document.getElementById('drop-icon-lo').textContent = '📂';
+  document.getElementById('drop-title-lo').textContent = 'Arrastrá logyt_template.xlsx o hacé clic';
+  document.getElementById('drop-sub-lo').textContent = 'Formato: una fila por cadena por período';
+  document.getElementById('logyt-stats').style.display = 'none';
+  document.getElementById('logyt-preview-section').style.display = 'none';
+}
+
+async function uploadLogyt(){
+  if(!parsedLogytRows.length) return;
+  const btn = document.getElementById('btn-lo-upload');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Subiendo...';
+  const pw = document.getElementById('lo-progress-wrap');
+  const pf = document.getElementById('lo-progress-fill');
+  const pl = document.getElementById('lo-progress-label');
+  pw.style.display = 'block';
+
+  pl.textContent = 'Verificando duplicados...';
+  const existing = await fetch(SUPABASE_URL+'/rest/v1/logyt_ventas?select=cadena,periodo_label',{headers:H}).then(r=>r.json());
+  const existingKeys = new Set((Array.isArray(existing)?existing:[]).map(e=>`${e.cadena}|${e.periodo_label}`));
+  const toUpload = parsedLogytRows.filter(r=>!existingKeys.has(`${r.cadena}|${r.periodo_label}`));
+
+  if(!toUpload.length){
+    toast('Todos los registros ya existen','error');
+    btn.disabled=false; btn.innerHTML='⬆ Subir a Supabase';
+    pw.style.display='none'; return;
+  }
+
+  let uploaded = 0;
+  for(let i=0; i<toUpload.length; i++){
+    pl.textContent = `Subiendo ${i+1} de ${toUpload.length}...`;
+    pf.style.width = Math.round((i/toUpload.length)*100)+'%';
+    const r = await fetch(SUPABASE_URL+'/rest/v1/logyt_ventas',{
+      method:'POST', headers:{...H,'Prefer':'return=minimal'},
+      body: JSON.stringify(toUpload[i])
+    });
+    if(r.ok) uploaded++; else { toast('Error en fila '+i,'error'); break; }
+  }
+
+  pf.style.width='100%';
+  pl.textContent=`✓ ${uploaded} registros subidos (${parsedLogytRows.length-toUpload.length} duplicados omitidos)`;
+  toast(`✓ ${uploaded} registros de ventas subidos`);
+  btn.disabled=false; btn.innerHTML='⬆ Subir a Supabase';
+}
+
+// Drag & drop
+document.addEventListener('DOMContentLoaded', ()=>{
+  const dzlo = document.getElementById('drop-zone-lo');
+  if(dzlo){
+    dzlo.addEventListener('dragover',e=>{e.preventDefault();dzlo.classList.add('drag');});
+    dzlo.addEventListener('dragleave',()=>dzlo.classList.remove('drag'));
+    dzlo.addEventListener('drop',e=>{e.preventDefault();dzlo.classList.remove('drag');handleLogytFile(e.dataTransfer.files[0]);});
+  }
+});
+
+// =====================
+// HISTORIAL
+// =====================
+function showTab(id,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='historial') loadHistorial();
+}
+
+async function loadHistorial(){
+  const [d1,d2] = await Promise.all([
+    fetch(SUPABASE_URL+'/rest/v1/dinamicas_mercado?select=*&order=created_at.desc&limit=30',{headers:H}).then(r=>r.json()),
+    fetch(SUPABASE_URL+'/rest/v1/logyt_ventas?select=*&order=created_at.desc&limit=20',{headers:H}).then(r=>r.json()),
+  ]);
+
+  let html = '<div class="section-title" style="margin-bottom:10px">Últimas dinámicas</div>';
+  if(Array.isArray(d1) && d1.length){
+    d1.forEach(d=>{
+      html += `<div class="data-item">
+        <div>
+          <span style="font-weight:500">${d.es_notco?'✦ ':''}${d.marca}</span>
+          <span style="color:var(--text2);margin-left:6px">${d.bandera} · ${d.categoria} · ${Math.round(d.profundidad*100)}%</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="color:var(--text3);font-family:'DM Mono',monospace;font-size:11px">${d.desde}</span>
+          <button class="btn-del" onclick="delDin(${d.id},this)">×</button>
+        </div>
+      </div>`;
+    });
+  } else html += '<div style="color:var(--text3);font-size:12px;padding:8px 0">Sin dinámicas cargadas aún.</div>';
+
+  html += '<div style="height:20px;border-top:1px solid var(--border);margin:16px 0"></div>';
+  html += '<div class="section-title" style="margin-bottom:10px">Ventas LOGYT</div>';
+  if(Array.isArray(d2) && d2.length){
+    d2.forEach(d=>{
+      html += `<div class="data-item">
+        <div>
+          <span style="font-weight:500">${d.cadena}</span>
+          <span style="color:var(--text2);margin-left:6px">${d.periodo_label} · ${Math.round(d.total).toLocaleString('es-AR')} uni ${d.tiene_dinamica?'✓ din.':''}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="color:var(--text3);font-family:'DM Mono',monospace;font-size:11px">${d.fecha_desde}</span>
+          <button class="btn-del" onclick="delLogyt(${d.id},this)">×</button>
+        </div>
+      </div>`;
+    });
+  } else html += '<div style="color:var(--text3);font-size:12px;padding:8px 0">Sin ventas cargadas aún.</div>';
+  document.getElementById('hist-content').innerHTML = html;
+}
+
+async function delDin(id,btn){ if(!confirm('¿Eliminar?')) return; btn.textContent='...'; await fetch(SUPABASE_URL+'/rest/v1/dinamicas_mercado?id=eq.'+id,{method:'DELETE',headers:H}); toast('Eliminado'); loadHistorial(); }
+async function delLogyt(id,btn){ if(!confirm('¿Eliminar?')) return; btn.textContent='...'; await fetch(SUPABASE_URL+'/rest/v1/logyt_ventas?id=eq.'+id,{method:'DELETE',headers:H}); toast('Eliminado'); loadHistorial(); }
+
+
+// =====================
+// LOGYT EXCEL PARSER
+// =====================
+parsedLogytRows = [];
+
+const PROD_MAP_LO = {
+  'NOTPROTEINBARS':'bars','NOTMILK':'milk',
+  'NOT BURGER':'burger','NOT MILA':'mila',
+  'NOT CHICKEN':'chicken','NOT PORK':'pork','NOT MILK':'milk',
+};
+
+const CADENA_MAP_LO = {
+  'JUMBO Y DISCO':'CENCO','DISCO Y JUMBO':'CENCO','JUMBO':'CENCO','DISCO':'CENCO',
+  'VEA':'VEA','CARREFOUR':'CARREFOUR','DIA':'DIA',
+  'LA ANONIMA':'LA_ANONIMA','LA ANÓNIMA':'LA_ANONIMA',
+};
+
+function detectCadenaFromStr(s){
+  const up = (s||'').toUpperCase().trim();
+  for(const [k,v] of Object.entries(CADENA_MAP_LO)){
+    if(up.includes(k)) return v;
+  }
+  return null;
+}
+
+function fmtDateFromSerial(val){
+  if(!val) return null;
+  if(val instanceof Date) return val.toISOString().slice(0,10);
+  if(typeof val==='number'){
+    const d = new Date(Math.round((val-25569)*86400*1000));
+    return d.toISOString().slice(0,10);
+  }
+  const s = String(val).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  return null;
+}
+
+function buildPeriodLabel(d1, d2){
+  if(!d1) return '?';
+  const a = new Date(d1), b = d2?new Date(d2):a;
+  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const da = a.getUTCDate(), ma = meses[a.getUTCMonth()];
+  const db = b.getUTCDate(), mb = meses[b.getUTCMonth()];
+  if(ma===mb) return `${da}-${db} ${mb}`;
+  return `${da} ${ma} - ${db} ${mb}`;
+}
+
+function handleLogytFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+      parsedLogytRows = parseLogytExcel(raw);
+      if(!parsedLogytRows.length){ toast('No se detectaron bloques de ventas','error'); return; }
+      showLogytPreview(file.name);
+    } catch(err){ toast('Error al leer: '+err.message,'error'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseLogytExcel(rows){
+  // Nuevo formato: productos en col[2], venta en col[3], fecha_desde col[6], fecha_hasta col[7], cadena col[8]
+  // Bloque 2: productos col[11], venta col[12], fecha_desde col[13], fecha_hasta col[14], cadena col[15]
+  const BLOCK_DEFS = [
+    {prod:2, val:3, fdesde:6, fhasta:7, cadena:8},
+    {prod:11, val:12, fdesde:13, fhasta:14, cadena:15},
+  ];
+
+  const results = [];
+  // Agrupar filas por bloque de cadena (detectar cambio de cadena por col[8] o col[15])
+  // Procesar fila por fila acumulando por bloque
+  const blocks = {}; // key: "cadena|periodo_label"
+
+  for(const row of rows){
+    if(!row) continue;
+    for(const bd of BLOCK_DEFS){
+      const prodName = row[bd.prod];
+      const val = row[bd.val];
+      const cadenaRaw = row[bd.cadena];
+      const fdesde = row[bd.fdesde];
+      const fhasta = row[bd.fhasta];
+
+      if(!prodName && !val) continue;
+
+      // Detectar cadena de esta fila o de filas anteriores del bloque
+      const prodStr = String(prodName||'').trim().toUpperCase();
+      const pk = PROD_MAP_LO[prodStr];
+
+      if(pk && typeof val==='number' && fdesde){
+        const cadena = detectCadenaFromStr(String(cadenaRaw||''));
+        const d1 = fmtDateFromSerial(fdesde);
+        const d2 = fmtDateFromSerial(fhasta||fdesde);
+        if(!d1) continue;
+        const label = buildPeriodLabel(d1, d2);
+        // Buscar cadena en bloque activo si no viene en esta fila
+        const blockKey = `${cadena||'?'}|${label}`;
+        if(!blocks[blockKey]) blocks[blockKey] = {cadena:cadena||'?', periodo_label:label, fecha_desde:d1, fecha_hasta:d2, tiene_dinamica:true, bars:0,burger:0,mila:0,chicken:0,pork:0,milk:0,total:0};
+        if(cadena) blocks[blockKey].cadena = cadena;
+        blocks[blockKey][pk] += Math.round(val*100)/100;
+      } else if(prodStr==='TOTAL VENTA (U)' && typeof val==='number'){
+        // Actualizar total del bloque correspondiente
+        const d1 = fmtDateFromSerial(fdesde||row[bd.fdesde]);
+        if(d1){
+          const label = buildPeriodLabel(d1, fmtDateFromSerial(fhasta));
+          for(const [k,b] of Object.entries(blocks)){
+            if(k.includes(label)) b.total = Math.round(val*100)/100;
+          }
+        }
+      }
+    }
+  }
+
+  // Ahora resolver cadenas desconocidas buscando la cadena del bloque más cercano
+  // Re-procesar para asignar cadenas a bloques sin cadena detectada
+  // Estrategia: si cadena es '?', buscar en la misma columna de cadena la fila anterior que tenga valor
+  const blockArr = Object.values(blocks);
+
+  // Recalcular totales si faltan
+  blockArr.forEach(b=>{
+    if(!b.total) b.total = Math.round((b.bars+b.burger+b.mila+b.chicken+b.pork+b.milk)*100)/100;
+    // Normalizar cadena
+    if(b.cadena==='?') b.cadena = 'UNKNOWN';
+  });
+
+  // Segunda pasada: asignar cadenas correctas recorriendo filas en orden
+  // Para bloques con cadena desconocida, usar la cadena de la columna de su bloque
+  const finalBlocks = {};
+  // Re-procesar con tracking de última cadena vista por columna de bloque
+  const lastCadena = {0: null, 1: null};
+  for(const row of rows){
+    if(!row) continue;
+    for(let bi=0;bi<BLOCK_DEFS.length;bi++){
+      const bd = BLOCK_DEFS[bi];
+      const cadenaRaw = row[bd.cadena];
+      if(cadenaRaw && typeof cadenaRaw==='string' && cadenaRaw.trim()){
+        const c = detectCadenaFromStr(cadenaRaw);
+        if(c) lastCadena[bi] = c;
+      }
+      const prodName = row[bd.prod];
+      const val = row[bd.val];
+      const fdesde = row[bd.fdesde];
+      if(!prodName || !val || !fdesde) continue;
+      const prodStr = String(prodName).trim().toUpperCase();
+      const pk = PROD_MAP_LO[prodStr];
+      if(!pk || typeof val!=='number') continue;
+      const d1 = fmtDateFromSerial(fdesde);
+      const d2 = fmtDateFromSerial(row[bd.fhasta]||fdesde);
+      if(!d1) continue;
+      const label = buildPeriodLabel(d1, d2);
+      const cadena = lastCadena[bi]||'UNKNOWN';
+      const key = `${cadena}|${label}`;
+      if(!finalBlocks[key]) finalBlocks[key]={cadena,periodo_label:label,fecha_desde:d1,fecha_hasta:d2,tiene_dinamica:true,bars:0,burger:0,mila:0,chicken:0,pork:0,milk:0,total:0};
+      finalBlocks[key][pk] += Math.round(val*100)/100;
+    }
+  }
+
+  const res = Object.values(finalBlocks).filter(b=>b.cadena!=='UNKNOWN');
+  res.forEach(b=>{ if(!b.total) b.total=Math.round((b.bars+b.burger+b.mila+b.chicken+b.pork+b.milk)*100)/100; });
+  return res;
+}
+
+function showLogytPreview(filename){
+  const dz = document.getElementById('drop-zone-lo');
+  dz.classList.add('loaded');
+  document.getElementById('drop-icon-lo').textContent = '✅';
+  document.getElementById('drop-title-lo').textContent = filename;
+  document.getElementById('drop-sub-lo').textContent = parsedLogytRows.length+' bloques detectados';
+
+  const cadenas = new Set(parsedLogytRows.map(r=>r.cadena)).size;
+  const periodos = new Set(parsedLogytRows.map(r=>r.periodo_label)).size;
+  document.getElementById('ls-bloques').textContent = parsedLogytRows.length;
+  document.getElementById('ls-cadenas').textContent = cadenas;
+  document.getElementById('ls-periodos').textContent = periodos;
+  document.getElementById('logyt-stats').style.display = 'block';
+
+  let html = `<tr><th>Cadena</th><th>Período</th><th>Barras</th><th>Burger</th><th>Mila</th><th>Chicken</th><th>Pork</th><th>Total</th><th>Din.</th></tr>`;
+  parsedLogytRows.forEach(r=>{
+    html += `<tr>
+      <td style="font-weight:500">${r.cadena}</td>
+      <td style="font-family:'DM Mono',monospace">${r.periodo_label}</td>
+      <td>${r.bars?Math.round(r.bars).toLocaleString('es-AR'):'—'}</td>
+      <td>${r.burger?Math.round(r.burger).toLocaleString('es-AR'):'—'}</td>
+      <td>${r.mila?Math.round(r.mila).toLocaleString('es-AR'):'—'}</td>
+      <td>${r.chicken?Math.round(r.chicken).toLocaleString('es-AR'):'—'}</td>
+      <td>${r.pork?Math.round(r.pork).toLocaleString('es-AR'):'—'}</td>
+      <td style="font-weight:600">${Math.round(r.total).toLocaleString('es-AR')}</td>
+      <td>${r.tiene_dinamica?'✓':'✗'}</td>
+    </tr>`;
+  });
+  document.getElementById('logyt-preview-table').innerHTML = html;
+  document.getElementById('logyt-preview-section').style.display = 'block';
+}
+
+function clearLogytFile(){
+  parsedLogytRows = [];
+  const dz = document.getElementById('drop-zone-lo');
+  dz.classList.remove('loaded');
+  document.getElementById('drop-icon-lo').textContent = '📂';
+  document.getElementById('drop-title-lo').textContent = 'Arrastrá el Excel de ventas o hacé clic';
+  document.getElementById('drop-sub-lo').textContent = 'Formato: venta_finde_cadenas.xlsx';
+  document.getElementById('logyt-stats').style.display = 'none';
+  document.getElementById('logyt-preview-section').style.display = 'none';
+}
+
+async function uploadLogyt(){
+  if(!parsedLogytRows.length) return;
+  const btn = document.getElementById('btn-lo-upload');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Subiendo...';
+  const pw = document.getElementById('lo-progress-wrap');
+  const pf = document.getElementById('lo-progress-fill');
+  const pl = document.getElementById('lo-progress-label');
+  pw.style.display = 'block';
+
+  pl.textContent = 'Verificando duplicados...';
+  const existing = await fetch(SUPABASE_URL+'/rest/v1/logyt_ventas?select=cadena,periodo_label',{headers:H}).then(r=>r.json());
+  const existingKeys = new Set((Array.isArray(existing)?existing:[]).map(e=>`${e.cadena}|${e.periodo_label}`));
+
+  const toUpload = parsedLogytRows.filter(r=>!existingKeys.has(`${r.cadena}|${r.periodo_label}`));
+
+  if(!toUpload.length){
+    toast('Todos los registros ya existen — sin duplicados','error');
+    btn.disabled=false; btn.innerHTML='⬆ Subir a Supabase';
+    pw.style.display='none'; return;
+  }
+
+  let uploaded = 0;
+  for(let i=0;i<toUpload.length;i++){
+    pl.textContent = `Subiendo ${i+1} de ${toUpload.length}...`;
+    pf.style.width = Math.round((i/toUpload.length)*100)+'%';
+    const r = await fetch(SUPABASE_URL+'/rest/v1/logyt_ventas',{
+      method:'POST',
+      headers:{...H,'Prefer':'return=minimal'},
+      body: JSON.stringify(toUpload[i])
+    });
+    if(r.ok) uploaded++;
+    else { toast('Error en bloque '+i,'error'); break; }
+  }
+
+  pf.style.width='100%';
+  pl.textContent=`✓ ${uploaded} bloques subidos (${parsedLogytRows.length-toUpload.length} duplicados omitidos)`;
+  toast(`✓ ${uploaded} registros de ventas subidos`);
+  btn.disabled=false; btn.innerHTML='⬆ Subir a Supabase';
+}
+
+// Drag & drop logyt
+const dzlo = document.getElementById('drop-zone-lo');
+if(dzlo){
+  dzlo.addEventListener('dragover',e=>{e.preventDefault();dzlo.classList.add('drag');});
+  dzlo.addEventListener('dragleave',()=>dzlo.classList.remove('drag'));
+  dzlo.addEventListener('drop',e=>{e.preventDefault();dzlo.classList.remove('drag');handleLogytFile(e.dataTransfer.files[0]);});
+}
+
+function toast(msg,type='success'){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast '+type+' show';
+  setTimeout(()=>t.className='toast',3500);
+}
+</script>
+</body>
+</html>
