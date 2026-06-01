@@ -3,6 +3,9 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Notco Dashboard — Admin</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -130,12 +133,12 @@ select option{background:var(--surface)}
     <div class="section-title">Cargar dinámicas desde Excel</div>
     <div class="section-sub">Subí el mismo Excel que completás cada semana. Se lee automáticamente la hoja "Dinamicas" y se suben todos los registros nuevos a Supabase de una sola vez.</div>
 
-    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-din').click()" style="cursor:pointer">
-      <input type="file" id="file-din" accept=".xlsx,.xls" onchange="handleFile(this.files[0])" style="display:none">
+    <label class="drop-zone" id="drop-zone" for="file-din" style="cursor:pointer;display:block">
+      <input type="file" id="file-din" accept=".xlsx,.xls" onchange="handleFile(this.files[0])" style="position:absolute;opacity:0;pointer-events:none">
       <div class="drop-icon" id="drop-icon">📂</div>
       <div class="drop-title" id="drop-title">Arrastrá el Excel o hacé clic para seleccionar</div>
       <div class="drop-sub" id="drop-sub">Publicaciones_Clientes_2025.xlsx · Hoja "Dinamicas"</div>
-    </div>
+    </label>
 
     <div id="stats-row" style="display:none">
       <div class="stats">
@@ -172,12 +175,12 @@ select option{background:var(--surface)}
     <div class="section-title">Cargar ventas LOGYT desde Excel</div>
     <div class="section-sub">Usá la plantilla plana. Cada semana agregás filas nuevas y subís el archivo — el sistema detecta solo los registros nuevos.</div>
 
-    <div class="drop-zone" id="drop-zone-lo" onclick="document.getElementById('file-lo').click()" style="cursor:pointer">
-      <input type="file" id="file-lo" accept=".xlsx,.xls" onchange="handleLogytFile(this.files[0])" style="display:none">
+    <label class="drop-zone" id="drop-zone-lo" for="file-lo" style="cursor:pointer;display:block">
+      <input type="file" id="file-lo" accept=".xlsx,.xls" onchange="handleLogytFile(this.files[0])" style="position:absolute;opacity:0;pointer-events:none">
       <div class="drop-icon" id="drop-icon-lo">📂</div>
       <div class="drop-title" id="drop-title-lo">Arrastrá logyt_template.xlsx o hacé clic</div>
       <div class="drop-sub" id="drop-sub-lo">Formato: una fila por cadena por período</div>
-    </div>
+    </label>
 
     <div id="logyt-stats" style="display:none">
       <div class="stats">
