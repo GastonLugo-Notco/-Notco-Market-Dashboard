@@ -139,6 +139,7 @@ select option{background:var(--surface)}
       <button class="tab active" onclick="showTab('dinamicas',this)">Dinámicas competencia</button>
       <button class="tab" onclick="showTab('logyt',this)">Performance LOGYT</button>
       <button class="tab" onclick="showTab('tendencia',this)">Tendencia por cadena</button>
+      <button class="tab" onclick="showTab('uplift',this)">📈 Uplift dinámica</button>
     </div>
   </div>
 </div>
@@ -170,17 +171,44 @@ select option{background:var(--surface)}
   <!-- TENDENCIA -->
   <div id="panel-tendencia" class="panel">
     <div class="chart-section">
-      <div class="chart-title">Evolución de ventas totales por cadena</div>
-      <div class="chart-sub">Unidades vendidas por período de dinámica</div>
+      <div class="chart-title">Evolución general — todas las cadenas</div>
+      <div class="chart-sub">Unidades vendidas por período (índice normalizado — base 100 = Semana 0)</div>
       <div class="legend">
         <div class="legend-item"><div class="legend-dot" style="background:#378ADD"></div>Carrefour</div>
         <div class="legend-item"><div class="legend-dot" style="background:#1db97a"></div>Dia</div>
         <div class="legend-item"><div class="legend-dot" style="background:#e85d5d"></div>La Anónima</div>
         <div class="legend-item"><div class="legend-dot" style="background:#f5a623"></div>Cenco</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#a09fff;border:1px dashed #a09fff"></div>Vea</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#a09fff"></div>Vea</div>
       </div>
-      <div style="position:relative;height:300px">
-        <canvas id="tendChart" role="img" aria-label="Evolución de ventas por cadena en los últimos findes"></canvas>
+      <div style="position:relative;height:260px">
+        <canvas id="tendChart" role="img" aria-label="Índice de evolución de ventas por cadena"></canvas>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:14px">
+      <div class="chart-section" style="margin:0">
+        <div class="chart-title" style="color:#378ADD">Carrefour</div>
+        <div class="chart-sub">7 días por período</div>
+        <div style="position:relative;height:160px"><canvas id="chartCarrefour"></canvas></div>
+      </div>
+      <div class="chart-section" style="margin:0">
+        <div class="chart-title" style="color:#1db97a">Dia</div>
+        <div class="chart-sub">7 días por período</div>
+        <div style="position:relative;height:160px"><canvas id="chartDia"></canvas></div>
+      </div>
+      <div class="chart-section" style="margin:0">
+        <div class="chart-title" style="color:#e85d5d">La Anónima</div>
+        <div class="chart-sub">7 días por período</div>
+        <div style="position:relative;height:160px"><canvas id="chartAnonima"></canvas></div>
+      </div>
+      <div class="chart-section" style="margin:0">
+        <div class="chart-title" style="color:#f5a623">Cenco (Disco+Jumbo)</div>
+        <div class="chart-sub">3 días por período</div>
+        <div style="position:relative;height:160px"><canvas id="chartCenco"></canvas></div>
+      </div>
+      <div class="chart-section" style="margin:0">
+        <div class="chart-title" style="color:#a09fff">Vea</div>
+        <div class="chart-sub">3 días — alterna con/sin dinámica</div>
+        <div style="position:relative;height:160px"><canvas id="chartVea"></canvas></div>
       </div>
     </div>
     <div class="chart-section">
@@ -194,6 +222,12 @@ select option{background:var(--surface)}
   </div>
 
 </div>
+
+  <!-- UPLIFT -->
+  <div id="panel-uplift" class="panel">
+    <div id="uplift-content"><div class="loading"><div class="spinner"></div>Calculando uplift...</div></div>
+  </div>
+
 
 <script>
 const SUPABASE_URL = 'https://vpewylzugoetmxgxwtkv.supabase.co';
@@ -251,6 +285,155 @@ function showTab(id, btn){
   document.getElementById('panel-'+id).classList.add('active');
   btn.classList.add('active');
   if(id==='tendencia') renderTendencia();
+  if(id==='uplift') renderUplift();
+}
+
+// Días de dinámica por cadena
+const DIAS_CADENA = {
+  CARREFOUR: 7, DIA: 7, LA_ANONIMA: 7, GDN: 7,
+  CENCO: 3, VEA: 3,
+  COTO: 6, JUMBO: 3, DISCO: 3,
+};
+
+function renderUplift(){
+  const el = document.getElementById('uplift-content');
+  if(!LOGYT||!LOGYT.length){ el.innerHTML='<div class="empty">Sin datos suficientes.</div>'; return; }
+
+  const cadenas = [
+    {key:'CARREFOUR',label:'Carrefour'},
+    {key:'DIA',label:'Dia'},
+    {key:'LA_ANONIMA',label:'La Anónima'},
+    {key:'CENCO',label:'Cenco (Disco+Jumbo)'},
+    {key:'VEA',label:'Vea'},
+  ];
+  const PRODS = ['bars','burger','mila','chicken','pork','milk'];
+  const PROD_LABELS = {bars:'Not Protein Bars',burger:'Not Burger',mila:'Not Mila',chicken:'Not Chicken',pork:'Not Pork',milk:'Not Milk'};
+
+  function getRows(cad){
+    return LOGYT.filter(d=>(d.cadena||'').toUpperCase()===cad.toUpperCase())
+      .sort((a,b)=>{const na=parseInt((a.periodo_label||'').replace(/[^0-9]/g,''))||0,nb=parseInt((b.periodo_label||'').replace(/[^0-9]/g,''))||0;return na-nb;});
+  }
+
+  // Obtener qué productos se dinamizaron por cadena y período
+  function getDinamizados(cadena, periodo_label){
+    // Buscar en DIN qué productos Notco salieron en esa cadena en ese período
+    const semNum = parseInt((periodo_label||'').replace(/[^0-9]/g,''))||0;
+    // Mapear semanas a fechas aproximadas
+    const semFechas = {
+      0: ['2026-04-28','2026-05-04'],
+      1: ['2026-05-05','2026-05-11'],
+      2: ['2026-05-12','2026-05-18'],
+      3: ['2026-05-19','2026-05-25'],
+      4: ['2026-05-26','2026-06-01'],
+    };
+    const [fDesde, fHasta] = semFechas[semNum] || ['',''];
+    
+    const dinamizados = DIN.filter(d=>{
+      if(!d.es_notco) return false;
+      const bandera = (d.bandera||'').toUpperCase();
+      const cad = cadena.toUpperCase();
+      if(cad==='CENCO') return bandera==='DISCO'||bandera==='JUMBO';
+      return bandera===cad;
+    }).filter(d=> d.desde <= fHasta && d.hasta >= fDesde);
+    
+    const prods = new Set();
+    dinamizados.forEach(d=>{
+      const desc = (d.descripcion||'').toLowerCase();
+      if(desc.includes('mila')||desc.includes('not mila')) prods.add('mila');
+      else if(desc.includes('burger')) prods.add('burger');
+      else if(desc.includes('chicken')||desc.includes('pollo')) prods.add('chicken');
+      else if(desc.includes('pork')||desc.includes('cerdo')) prods.add('pork');
+      else if(desc.includes('bar')) prods.add('bars');
+      else if(desc.includes('milk')||desc.includes('leche')) prods.add('milk');
+      else if(desc.includes('surtido')||desc.includes('completa')||desc.includes('completo')){
+        ['bars','burger','mila','chicken','pork'].forEach(p=>prods.add(p));
+      }
+    });
+    return prods;
+  }
+
+  function fmt(n){ return n?Math.round(n).toLocaleString('es-AR'):'—'; }
+  function pct(a,b){ if(!a||!b) return null; return Math.round((b-a)/a*100); }
+  function fmtPct(v){ if(v===null) return '—'; return (v>0?'+':'')+v+'%'; }
+
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:16px">';
+
+  cadenas.forEach(c=>{
+    const rows = getRows(c.key);
+    if(rows.length<2){ return; }
+
+    // Para cada par de semanas consecutivas, calcular uplift por producto
+    const prodData = {};
+    PRODS.forEach(p=>{ prodData[p]={conDin:[],sinDin:[]}; });
+
+    for(let i=0; i<rows.length; i++){
+      const r = rows[i];
+      const dinizados = getDinamizados(c.key, r.periodo_label);
+      PRODS.forEach(p=>{
+        const val = r[p]||0;
+        if(val===0) return;
+        if(dinizados.has(p)) prodData[p].conDin.push(val);
+        else prodData[p].sinDin.push(val);
+      });
+    }
+
+    html += `<div class="cadena-card">
+      <div class="cadena-card-header">
+        <span class="cadena-name">${c.label}</span>
+        <span style="font-size:11px;color:var(--text3);font-family:monospace">${rows.length} semanas</span>
+      </div>
+      <div class="cadena-body">`;
+
+    let hayData = false;
+    PRODS.forEach(p=>{
+      const con = prodData[p].conDin;
+      const sin = prodData[p].sinDin;
+      if(!con.length && !sin.length) return;
+      
+      const avgCon = con.length ? Math.round(con.reduce((a,b)=>a+b,0)/con.length) : null;
+      const avgSin = sin.length ? Math.round(sin.reduce((a,b)=>a+b,0)/sin.length) : null;
+      const uplift = avgCon&&avgSin ? pct(avgSin,avgCon) : null;
+      
+      hayData = true;
+      const uClass = uplift===null?'nt':uplift>0?'up':'dn';
+      
+      // Barra visual
+      const maxVal = Math.max(avgCon||0, avgSin||0);
+      const barCon = avgCon ? Math.round((avgCon/maxVal)*100) : 0;
+      const barSin = avgSin ? Math.round((avgSin/maxVal)*100) : 0;
+      
+      html += `<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:600">${PROD_LABELS[p]}</span>
+          <span class="${uClass}" style="font-size:13px;font-weight:700;font-family:monospace">${fmtPct(uplift)}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:11px">
+            <span style="color:var(--text3);width:80px">Con din.</span>
+            <div style="flex:1;background:var(--border);border-radius:99px;height:6px">
+              <div style="width:${barCon}%;background:var(--green);border-radius:99px;height:100%"></div>
+            </div>
+            <span style="color:var(--text);font-family:monospace;width:60px;text-align:right">${fmt(avgCon)}</span>
+            <span style="color:var(--text3);font-size:10px">(${con.length}sem)</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:11px">
+            <span style="color:var(--text3);width:80px">Sin din.</span>
+            <div style="flex:1;background:var(--border);border-radius:99px;height:6px">
+              <div style="width:${barSin}%;background:var(--surface3);border-radius:99px;height:100%"></div>
+            </div>
+            <span style="color:var(--text);font-family:monospace;width:60px;text-align:right">${fmt(avgSin)}</span>
+            <span style="color:var(--text3);font-size:10px">(${sin.length}sem)</span>
+          </div>
+        </div>
+      </div>`;
+    });
+
+    if(!hayData) html += '<div style="color:var(--text3);font-size:12px">Sin datos suficientes para calcular uplift.</div>';
+    html += '</div></div>';
+  });
+
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function toggleComp(){
@@ -347,7 +530,11 @@ function renderDin(){
 
         const chips = Object.values(byCadena).map(c=>{
           const prof = c.profs.length===1 ? c.profs[0] : Math.max(...c.profs);
-          const repeat = c.count>1 ? `<span style="font-size:10px;font-weight:600;color:var(--amber);margin-left:3px" title="${c.count} veces en el mes">×${c.count}</span>` : '';
+          // Calcular días de exposición
+          const DIAS = {CARREFOUR:7,DIA:7,'LA ANONIMA':7,'LA_ANONIMA':7,GDN:7,CENCO:3,VEA:3,JUMBO:3,DISCO:3,COTO:6,COOPE:7};
+          const diasPorOcurrencia = DIAS[c.bandera.toUpperCase()]||7;
+          const totalDias = c.count * diasPorOcurrencia;
+          const repeat = c.count>1 ? `<span style="font-size:10px;font-weight:600;color:var(--amber);margin-left:4px" title="${c.count} publicaciones = ${totalDias} días">${totalDias}d</span>` : `<span style="font-size:10px;color:var(--text3);margin-left:4px">${diasPorOcurrencia}d</span>`;
           return `<span class="chip">${c.bandera} <span class="chip-pct">${prof}%</span>${repeat}</span>`;
         }).join('');
 
@@ -467,29 +654,24 @@ function renderDin(){
 
   function renderTendencia(){
     const cadenas = [
-      {key:'CARREFOUR',label:'Carrefour',color:'#378ADD'},
-      {key:'DIA',label:'Dia',color:'#1db97a'},
-      {key:'LA_ANONIMA',label:'La Anónima',color:'#e85d5d'},
-      {key:'CENCO',label:'Cenco',color:'#f5a623'},
-      {key:'VEA',label:'Vea',color:'#a09fff'},
+      {key:'CARREFOUR',label:'Carrefour',color:'#378ADD',dias:7,canvasId:'chartCarrefour'},
+      {key:'DIA',label:'Dia',color:'#1db97a',dias:7,canvasId:'chartDia'},
+      {key:'LA_ANONIMA',label:'La Anónima',color:'#e85d5d',dias:7,canvasId:'chartAnonima'},
+      {key:'CENCO',label:'Cenco',color:'#f5a623',dias:3,canvasId:'chartCenco'},
+      {key:'VEA',label:'Vea',color:'#a09fff',dias:3,canvasId:'chartVea'},
     ];
+
     if(!LOGYT.length) return;
 
     function getRows(cad){
       return LOGYT.filter(d=>(d.cadena||'').toUpperCase()===cad.toUpperCase())
-                  .sort((a,b)=>(a.fecha_desde||'')>(b.fecha_desde||'')?1:-1);
+        .sort((a,b)=>{const na=parseInt((a.periodo_label||'').replace(/[^0-9]/g,''))||0,nb=parseInt((b.periodo_label||'').replace(/[^0-9]/g,''))||0;return na-nb;});
     }
 
-    // Obtener todos los labels de semana únicos ordenados
     const allLabels = [...new Set(LOGYT.map(d=>d.periodo_label))]
-      .sort((a,b)=>{
-        // Ordenar por número de semana
-        const na = parseInt(a.replace(/[^0-9]/g,''))||0;
-        const nb = parseInt(b.replace(/[^0-9]/g,''))||0;
-        return na-nb;
-      });
+      .sort((a,b)=>{const na=parseInt((a||'').replace(/[^0-9]/g,''))||0,nb=parseInt((b||'').replace(/[^0-9]/g,''))||0;return na-nb;});
 
-    // Gráfico 1: total por cadena usando periodo_label como eje X
+    // Gráfico general normalizado (base 100 = Semana 0)
     if(tendChart) tendChart.destroy();
     tendChart = new Chart(document.getElementById('tendChart'),{
       type:'line',
@@ -498,14 +680,13 @@ function renderDin(){
         datasets: cadenas.map(c=>{
           const rows = getRows(c.key);
           const rowMap = {};
-          rows.forEach(r=>{ rowMap[r.periodo_label] = Math.round(r.total||0); });
+          rows.forEach(r=>{ rowMap[r.periodo_label]=Math.round(r.total||0); });
+          const base = rowMap[allLabels[0]]||1;
           return {
             label:c.label,
-            data: allLabels.map(l=>rowMap[l]||null),
-            borderColor:c.color,
-            backgroundColor:c.color+'18',
-            tension:0.3, fill:false,
-            pointRadius:5, pointHoverRadius:7,
+            data: allLabels.map(l=>rowMap[l]?Math.round((rowMap[l]/base)*100):null),
+            borderColor:c.color, backgroundColor:c.color+'18',
+            tension:0.3, fill:false, pointRadius:4,
             borderDash:c.key==='VEA'?[5,3]:undefined,
             spanGaps:true,
           };
@@ -515,16 +696,73 @@ function renderDin(){
         responsive:true, maintainAspectRatio:false,
         plugins:{
           legend:{display:false},
-          tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${(ctx.parsed.y||0).toLocaleString('es-AR')} uni`}}
+          tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y} (índice)`}}
         },
         scales:{
-          x:{grid:{display:false},ticks:{color:'rgba(240,240,248,0.4)',font:{size:11}}},
-          y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.4)',callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v,font:{size:11}}}
+          x:{grid:{display:false},ticks:{color:'rgba(240,240,248,0.4)',font:{size:10}}},
+          y:{
+            grid:{color:'rgba(255,255,255,0.04)'},
+            ticks:{color:'rgba(240,240,248,0.4)',font:{size:10},callback:v=>v+''},
+            min:0,
+          }
         }
       }
     });
 
-    // Gráfico 2: por producto sumando todas las cadenas por periodo_label
+    // Gráficos individuales por cadena
+    cadenas.forEach(c=>{
+      const canvas = document.getElementById(c.canvasId);
+      if(!canvas) return;
+      const existingChart = Chart.getChart(canvas);
+      if(existingChart) existingChart.destroy();
+
+      const rows = getRows(c.key);
+      if(!rows.length) return;
+
+      const labels = rows.map(r=>{
+        // Mostrar semana + fechas
+        return r.periodo_label + (r.fecha_desde?` (${r.fecha_desde.slice(5)})` :'');
+      });
+
+      // Colorear puntos según si tiene dinámica o no
+      const pointColors = rows.map(r=>r.tiene_dinamica?c.color:'rgba(200,200,200,0.5)');
+
+      new Chart(canvas,{
+        type:'line',
+        data:{
+          labels,
+          datasets:[{
+            label:c.label,
+            data: rows.map(r=>Math.round(r.total||0)),
+            borderColor:c.color,
+            backgroundColor:c.color+'25',
+            tension:0.3, fill:true,
+            pointRadius:6, pointHoverRadius:8,
+            pointBackgroundColor: pointColors,
+            pointBorderColor: pointColors,
+          }]
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          plugins:{
+            legend:{display:false},
+            tooltip:{callbacks:{
+              label:ctx=>{
+                const r = rows[ctx.dataIndex];
+                const din = r.tiene_dinamica?'Con din.':'Sin din.';
+                return `${ctx.parsed.y.toLocaleString('es-AR')} uni — ${din}`;
+              }
+            }}
+          },
+          scales:{
+            x:{grid:{display:false},ticks:{color:'rgba(240,240,248,0.4)',font:{size:9},maxRotation:30}},
+            y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.4)',font:{size:9},callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}
+          }
+        }
+      });
+    });
+
+    // Gráfico por producto
     const prods = ['bars','burger','mila','chicken','pork','milk'];
     const prodColors = {bars:'#1db97a',burger:'#6c63ff',mila:'#f5a623',chicken:'#e85d5d',pork:'#378ADD',milk:'#7ecfb0'};
     const prodNames = {bars:'Not Protein Bars',burger:'Not Burger',mila:'Not Mila',chicken:'Not Chicken',pork:'Not Pork',milk:'Not Milk'};
@@ -545,19 +783,17 @@ function renderDin(){
     prodChart = new Chart(document.getElementById('prodChart'),{
       type:'line',
       data:{
-        labels: allLabels,
-        datasets: prods.map(p=>({
+        labels:allLabels,
+        datasets:prods.map(p=>({
           label:prodNames[p],
-          data: allLabels.map(l=>Math.round(byLabel[l]?.[p]||0)),
-          borderColor:prodColors[p],
-          backgroundColor:prodColors[p]+'18',
-          tension:0.3, fill:false,
-          pointRadius:4, pointHoverRadius:6,
+          data:allLabels.map(l=>Math.round(byLabel[l]?.[p]||0)),
+          borderColor:prodColors[p], backgroundColor:prodColors[p]+'18',
+          tension:0.3, fill:false, pointRadius:4,
         }))
       },
       options:{
         responsive:true, maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${(ctx.parsed.y||0).toLocaleString('es-AR')} uni`}}},
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('es-AR')} uni`}}},
         scales:{
           x:{grid:{display:false},ticks:{color:'rgba(240,240,248,0.4)',font:{size:11}}},
           y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(240,240,248,0.4)',callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v,font:{size:11}}}
